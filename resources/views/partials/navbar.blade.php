@@ -1,12 +1,11 @@
 <nav class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
     <div class="container mx-auto px-4 lg:px-8">
         <div class="flex h-16 items-center justify-between">
-            {{-- Logo --}}
             <a href="/" class="flex items-center space-x-2">
                 <div class="h-9 w-9 rounded-lg bg-primary-900 flex items-center justify-center">
                     <i class="fas fa-shopping-bag text-white text-lg"></i>
                 </div>
-                <span class="text-xl font-bold text-primary-900 hidden sm:inline">Market<span class="text-primary-600">Place</span></span>
+                <span class="text-xl font-bold text-primary-900 hidden sm:inline">ECOMMERCE<span class="text-primary-600"> TEST</span></span>
                 <span class="text-xl font-bold text-primary-900 sm:hidden">MP</span>
             </a>
 
@@ -48,7 +47,6 @@
                 $mobileInactive = 'text-gray-700 hover:text-primary-900 hover:bg-primary-50/50';
             @endphp
 
-            {{-- Desktop Navigation --}}
             <div class="hidden md:flex items-center space-x-8">
                 <div class="flex items-center space-x-6">
                     <a href="{{ $productsHref }}" class="{{ $productsClass }}">
@@ -56,7 +54,6 @@
                     </a>
                     <a href="{{ $cartHref }}" class="{{ $cartClass }} relative">
                         <i class="fas fa-shopping-cart mr-2"></i>Keranjang
-                        {{-- Cart Badge --}}
                         <span data-cart-count-badge class="absolute -top-2 -right-4 bg-primary-900 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
                             {{ $cartCount }}
                         </span>
@@ -100,13 +97,11 @@
                 </div>
             </div>
 
-            {{-- Mobile Menu Button --}}
             <button id="mobile-menu-button" class="md:hidden text-gray-700 hover:text-primary-900 p-2">
                 <i class="fas fa-bars text-xl"></i>
             </button>
         </div>
 
-        {{-- Mobile Navigation --}}
         <div id="mobile-menu" class="md:hidden hidden border-t border-gray-200 py-4 px-4 bg-white">
             <div class="flex flex-col space-y-4">
                 <a href="{{ $productsHref }}" class="{{ $mobileItemBase }} {{ $isProductsActive ? $mobileActive : $mobileInactive }}">
@@ -160,7 +155,6 @@
     </div>
 </nav>
 
-{{-- Mobile Menu Script --}}
 <script>
     document.getElementById('mobile-menu-button').addEventListener('click', function() {
         const menu = document.getElementById('mobile-menu');

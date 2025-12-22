@@ -1,7 +1,6 @@
 <footer class="bg-gradient-to-b from-white to-gray-50 border-t border-gray-200 mt-auto">
     <div class="container mx-auto px-4 lg:px-8 py-12">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {{-- Company Info --}}
             <div>
                 <div class="flex items-center space-x-3 mb-6">
                     <div class="h-10 w-10 rounded-lg bg-primary-900 flex items-center justify-center">
@@ -28,7 +27,6 @@
                 </div>
             </div>
 
-            {{-- Quick Links --}}
             <div>
                 <h3 class="text-lg font-bold text-gray-900 mb-6">Tautan Cepat</h3>
                 <ul class="space-y-3">
@@ -59,7 +57,6 @@
                 </ul>
             </div>
 
-            {{-- Newsletter --}}
             <div>
                 <h3 class="text-lg font-bold text-gray-900 mb-6">Tetap Terhubung</h3>
                 <p class="text-gray-600 mb-4">
@@ -80,7 +77,6 @@
             </div>
         </div>
 
-        {{-- Copyright --}}
         <div class="border-t border-gray-200 mt-10 pt-8">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <p class="text-gray-600 text-sm mb-4 md:mb-0">

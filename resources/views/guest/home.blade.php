@@ -11,14 +11,12 @@
 @endphp
 
 <div class="container mx-auto px-4 lg:px-8 py-8">
-    {{-- Hero Section --}}
     <div class="rounded-2xl bg-gradient-to-r from-primary-900 via-primary-800 to-primary-700 p-6 md:p-10 mb-8 md:mb-12 shadow-xl">
         <div class="max-w-2xl">
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-4">Temukan Produk Terbaik</h1>
             <p class="text-lg text-primary-100 mb-6">Marketplace terpercaya dengan ribuan produk dari seller berkualitas</p>
             
             <form method="GET" action="{{ Route::has('home') ? route('home') : url('/') }}" class="space-y-3">
-                {{-- Search Bar --}}
                 <div class="relative max-w-xl">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <i class="fas fa-search text-gray-300"></i>
@@ -32,7 +30,6 @@
                     >
                 </div>
 
-                {{-- Inline controls (mobile friendly) --}}
                 <div class="max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-white/80 mb-1">Ketersediaan</label>
@@ -74,7 +71,6 @@
         </div>
     </div>
 
-    {{-- Products Grid --}}
     <div class="mb-8">
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-900">Produk Terbaru</h2>
@@ -93,7 +89,6 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             @forelse ($products ?? [] as $product)
                 <div class="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                    {{-- Product Image Placeholder --}}
                     <div class="h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center relative overflow-hidden">
                         @if(!empty($product->image_url))
                             <img src="{{ $product->image_url }}" alt="{{ $product->name ?? 'Produk' }}" class="h-full w-full object-cover" />
@@ -114,7 +109,6 @@
                     </div>
                     
                     <div class="p-5">
-                        {{-- Product Info --}}
                         <div class="mb-3">
                             <h3 class="font-bold text-gray-900 group-hover:text-primary-900 line-clamp-2 mb-2">
                                 {{ $product->name ?? 'Nama Produk' }}
@@ -124,7 +118,6 @@
                             </p>
                         </div>
                         
-                        {{-- Seller Info --}}
                         <div class="flex items-center mb-4">
                             <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center mr-3">
                                 <i class="fas fa-store text-primary-900 text-sm"></i>
@@ -135,7 +128,6 @@
                             </div>
                         </div>
                         
-                        {{-- Price & Stock --}}
                         <div class="flex justify-between items-center mb-4">
                             <div>
                                 <p class="text-2xl font-bold text-primary-900">
@@ -156,7 +148,6 @@
                             </div>
                         </div>
                         
-                        {{-- Add to Cart Form --}}
                         @php
                             $addAction = Route::has('cart.add') 
                                 ? route('cart.add', ['product' => $product->id]) 
@@ -223,7 +214,6 @@
             @endforelse
         </div>
         
-        {{-- Pagination --}}
         @if(!empty($products) && method_exists($products, 'links'))
             <div class="mt-10 flex justify-center">
                 {{ $products->links() }}
@@ -234,7 +224,6 @@
 
 <div id="js-toast-container" class="fixed top-5 right-5 space-y-3" style="z-index: 9999;"></div>
 
-{{-- Quantity Script --}}
 <script>
     const showToast = (message) => {
         let container = document.getElementById('js-toast-container');
@@ -350,7 +339,6 @@
         overflow: hidden;
     }
     
-    /* Hide number input arrows */
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
         -webkit-appearance: none;

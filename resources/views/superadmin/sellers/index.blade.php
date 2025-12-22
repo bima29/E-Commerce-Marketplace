@@ -56,10 +56,18 @@
                     <a href="{{ $editHref }}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
                         Edit
                     </a>
-                    <form method="POST" action="{{ $deleteAction }}">
+                    <form id="js-delete-seller-form-{{ $seller->id }}" method="POST" action="{{ $deleteAction }}">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="w-full inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100">
+                        <button
+                            type="button"
+                            class="w-full inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 js-delete-seller-btn"
+                            data-form-id="js-delete-seller-form-{{ $seller->id }}"
+                            data-seller-id="{{ $seller->id }}"
+                            data-seller-name="{{ $seller->name ?? '-' }}"
+                            data-seller-email="{{ $seller->email ?? '-' }}"
+                            data-seller-status="{{ $seller->status ?? ($isActive ? 'Aktif' : 'Nonaktif') }}"
+                        >
                             Hapus
                         </button>
                     </form>
@@ -117,10 +125,18 @@
                                 <a href="{{ $editHref }}" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
                                     Edit
                                 </a>
-                                <form method="POST" action="{{ $deleteAction }}">
+                                <form id="js-delete-seller-form-{{ $seller->id }}" method="POST" action="{{ $deleteAction }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 js-delete-seller-btn"
+                                        data-form-id="js-delete-seller-form-{{ $seller->id }}"
+                                        data-seller-id="{{ $seller->id }}"
+                                        data-seller-name="{{ $seller->name ?? '-' }}"
+                                        data-seller-email="{{ $seller->email ?? '-' }}"
+                                        data-seller-status="{{ $seller->status ?? ($isActive ? 'Aktif' : 'Nonaktif') }}"
+                                    >
                                         Hapus
                                     </button>
                                 </form>
@@ -135,4 +151,121 @@
             </tbody>
         </table>
     </div>
+
+    <div id="js-delete-seller-modal" class="fixed inset-0 hidden" style="z-index: 9999;">
+        <div class="absolute inset-0 bg-gray-900/50"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-200 flex items-start justify-between gap-4">
+                    <div>
+                        <div class="text-lg font-bold text-gray-900">Konfirmasi Hapus Seller</div>
+                        <div class="text-sm text-gray-600 mt-1">Data yang dihapus tidak bisa dikembalikan.</div>
+                    </div>
+                    <button type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700" data-modal-close>
+                        &times;
+                    </button>
+                </div>
+
+                <div class="px-6 py-5">
+                    <div class="rounded-xl border border-red-200 bg-red-50 p-4">
+                        <div class="text-sm font-semibold text-red-800">Kamu akan menghapus:</div>
+                        <div class="mt-3 grid grid-cols-1 gap-3 text-sm">
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="text-gray-600">ID</div>
+                                <div id="js-delete-seller-id" class="font-semibold text-gray-900">-</div>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="text-gray-600">Nama Toko</div>
+                                <div id="js-delete-seller-name" class="font-semibold text-gray-900 text-right">-</div>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="text-gray-600">Email</div>
+                                <div id="js-delete-seller-email" class="font-semibold text-gray-900 text-right">-</div>
+                            </div>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="text-gray-600">Status</div>
+                                <div id="js-delete-seller-status" class="font-semibold text-gray-900">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 py-5 border-t border-gray-200">
+                    <div class="flex flex-col sm:flex-row gap-3 justify-end">
+                        <button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 px-5 py-3 text-sm font-semibold" data-modal-close>
+                            Batal
+                        </button>
+                        <button id="js-delete-seller-confirm" type="button" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 hover:bg-red-700 text-white px-5 py-3 text-sm font-semibold">
+                            Ya, Hapus
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        (function () {
+            const modal = document.getElementById('js-delete-seller-modal');
+            const confirmBtn = document.getElementById('js-delete-seller-confirm');
+            if (!modal || !confirmBtn) return;
+
+            const idEl = document.getElementById('js-delete-seller-id');
+            const nameEl = document.getElementById('js-delete-seller-name');
+            const emailEl = document.getElementById('js-delete-seller-email');
+            const statusEl = document.getElementById('js-delete-seller-status');
+
+            let activeFormId = null;
+
+            const openModal = () => {
+                modal.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+                confirmBtn.focus();
+            };
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+                activeFormId = null;
+            };
+
+            document.querySelectorAll('.js-delete-seller-btn').forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    activeFormId = this.getAttribute('data-form-id');
+
+                    if (idEl) idEl.textContent = this.getAttribute('data-seller-id') || '-';
+                    if (nameEl) nameEl.textContent = this.getAttribute('data-seller-name') || '-';
+                    if (emailEl) emailEl.textContent = this.getAttribute('data-seller-email') || '-';
+                    if (statusEl) statusEl.textContent = this.getAttribute('data-seller-status') || '-';
+
+                    openModal();
+                });
+            });
+
+            modal.querySelectorAll('[data-modal-close]').forEach((btn) => {
+                btn.addEventListener('click', closeModal);
+            });
+
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal || e.target === modal.firstElementChild) {
+                    closeModal();
+                }
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (modal.classList.contains('hidden')) return;
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+
+            confirmBtn.addEventListener('click', function () {
+                if (!activeFormId) return;
+                const form = document.getElementById(activeFormId);
+                if (form) form.submit();
+            });
+        })();
+    </script>
+    @endpush
 @endsection

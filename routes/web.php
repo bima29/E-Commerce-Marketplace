@@ -102,13 +102,10 @@ Route::get('/cart', function () {
 
 Route::post('/cart/add/{product}', function (Request $request, $product) {
     $wantsJson = $request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest';
-    $qty = (int) $request->input('qty', 1);
-    if ($qty < 1) {
-        if ($wantsJson) {
-            return response()->json(['message' => 'Qty minimal 1'], 422);
-        }
-        return back()->with('error', 'Qty minimal 1');
-    }
+    $validated = $request->validate([
+        'qty' => ['required', 'integer', 'min:1'],
+    ]);
+    $qty = (int) ($validated['qty'] ?? 1);
 
     $p = Product::query()->find($product);
     if (!$p) {
@@ -251,7 +248,11 @@ Route::post('/cart/remove/{product}', function ($product) {
 
 Route::post('/cart/update', function (Request $request) {
     $wantsJson = $request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest';
-    $items = (array) $request->input('items', []);
+    $validated = $request->validate([
+        'items' => ['nullable', 'array'],
+        'items.*' => ['nullable', 'integer', 'min:0'],
+    ]);
+    $items = (array) ($validated['items'] ?? []);
 
     $sessionId = session()->getId();
     $userId = Auth::id();
@@ -436,8 +437,8 @@ Route::post('/checkout', function (Request $request) {
             ]);
 
             foreach ($cartItems as $ci) {
-                $product = $ci->product;
-                if (!$product) {
+                $ciProductId = (int) ($ci->product_id ?? 0);
+                if ($ciProductId < 1) {
                     continue;
                 }
 
@@ -446,7 +447,11 @@ Route::post('/checkout', function (Request $request) {
                     continue;
                 }
 
-                $product->refresh();
+                $product = Product::query()->whereKey($ciProductId)->lockForUpdate()->first();
+                if (!$product) {
+                    continue;
+                }
+
                 if (((int) ($product->stock ?? 0)) < $qty) {
                     throw new \RuntimeException('Stok tidak cukup untuk produk: ' . ($product->name ?? ''));
                 }
@@ -761,7 +766,7 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
                     $seller = \App\Models\Seller::query()->findOrFail($validated['seller_id']);
 
                     $sellerStatus = $seller->status ?? null;
-                    $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif';
+                    $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif' || $sellerStatus === 'nonaktif';
                     if ($isInactive) {
                         return back()->withInput()->withErrors([
                             'seller_id' => 'Produk tidak dapat ditambahkan jika seller berstatus Nonaktif.',
@@ -823,7 +828,7 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
                 }
 
                 $sellerStatus = $seller->status ?? null;
-                $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif';
+                $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif' || $sellerStatus === 'nonaktif';
                 if ($isInactive) {
                     return back()->withInput()->withErrors([
                         'seller_id' => 'Produk tidak dapat dipindahkan/disimpan ke seller berstatus Nonaktif.',
@@ -854,7 +859,7 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
     });
 });
 
-Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(function () {
+    Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(function () {
     Route::prefix('store')->name('store.')->group(function () {
         Route::get('/', function () {
             $user = Auth::user();
@@ -887,8 +892,19 @@ Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(fun
                 'name' => ['required', 'string', 'max:255'],
             ]);
 
-            $seller->name = $validated['name'];
-            $seller->save();
+            try {
+                DB::transaction(function () use ($validated, $seller, $user) {
+                    $seller->name = $validated['name'];
+                    $seller->save();
+
+                    if ($user) {
+                        $user->name = $validated['name'];
+                        $user->save();
+                    }
+                });
+            } catch (\Throwable $e) {
+                return back()->withInput()->with('error', $e->getMessage());
+            }
 
             return back()->with('success', 'Toko berhasil diperbarui');
         })->name('update');
@@ -926,7 +942,9 @@ Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(fun
 
             if (class_exists(\App\Models\Seller::class)) {
                 $seller = \App\Models\Seller::query()->find($sellerId);
-                if ($seller && (($seller->status ?? null) === 'inactive')) {
+                $sellerStatus = $seller?->status ?? null;
+                $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif' || $sellerStatus === 'nonaktif';
+                if ($seller && $isInactive) {
                     return back()->withInput()->with('error', 'Produk tidak dapat ditambahkan jika seller berstatus Nonaktif.');
                 }
             }
