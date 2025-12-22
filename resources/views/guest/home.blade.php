@@ -28,11 +28,8 @@
                         name="q"
                         value="{{ $q }}"
                         placeholder="Cari produk (contoh: kaos, sepatu, hoodie)"
-                        class="w-full pl-12 pr-24 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
+                        class="w-full pl-12 pr-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
                     >
-                    <button type="submit" class="absolute right-2 top-2 bg-white text-primary-900 hover:bg-gray-100 px-4 py-1.5 rounded-md font-semibold transition-colors">
-                        Cari
-                    </button>
                 </div>
 
                 {{-- Inline controls (mobile friendly) --}}
@@ -57,6 +54,12 @@
                             <option value="name_desc" {{ $sort === 'name_desc' ? 'selected' : '' }}>Nama Z-A</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="max-w-xl">
+                    <button type="submit" class="w-full sm:w-auto bg-white text-primary-900 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold transition-colors">
+                        Cari
+                    </button>
                 </div>
 
                 @if ($hasQuery)
@@ -92,9 +95,13 @@
                 <div class="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     {{-- Product Image Placeholder --}}
                     <div class="h-48 bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center relative overflow-hidden">
-                        <div class="text-primary-900 opacity-20">
-                            <i class="fas fa-shopping-bag text-6xl"></i>
-                        </div>
+                        @if(!empty($product->image_url))
+                            <img src="{{ $product->image_url }}" alt="{{ $product->name ?? 'Produk' }}" class="h-full w-full object-cover" />
+                        @else
+                            <div class="text-primary-900 opacity-20">
+                                <i class="fas fa-shopping-bag text-6xl"></i>
+                            </div>
+                        @endif
                         @if($product->stock > 0)
                             <span class="absolute top-3 right-3 bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
                                 <i class="fas fa-check-circle mr-1"></i>Tersedia
@@ -143,9 +150,9 @@
                             <div class="text-right">
                                 <div class="flex items-center text-yellow-400">
                                     <i class="fas fa-star text-sm"></i>
-                                    <span class="ml-1 text-sm font-medium text-gray-700">4.8</span>
+                                    <span class="ml-1 text-sm font-medium text-gray-700">{{ number_format((float)($product->rating_avg ?? 0), 1) }}</span>
                                 </div>
-                                <p class="text-xs text-gray-500">Terjual 250+</p>
+                                <p class="text-xs text-gray-500">Terjual {{ number_format((int)($product->sold_count ?? 0), 0, ',', '.') }}</p>
                             </div>
                         </div>
                         
@@ -217,21 +224,9 @@
         </div>
         
         {{-- Pagination --}}
-        @if(!empty($products) && count($products) > 0)
+        @if(!empty($products) && method_exists($products, 'links'))
             <div class="mt-10 flex justify-center">
-                <nav class="flex items-center space-x-2">
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary-900 text-white font-medium">1</button>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">2</button>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">3</button>
-                    <span class="px-2 text-gray-400">...</span>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">10</button>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </nav>
+                {{ $products->links() }}
             </div>
         @endif
     </div>

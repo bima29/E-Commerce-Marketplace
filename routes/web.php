@@ -1,7 +1,13 @@
 <?php
 
+use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function (Request $request) {
@@ -10,7 +16,9 @@ Route::get('/', function (Request $request) {
     $sort = (string) $request->query('sort', 'newest');
 
     if (class_exists(\App\Models\Product::class)) {
-        $query = \App\Models\Product::query();
+        $query = Product::query();
+
+        $query->where('status', 'active');
 
         if (method_exists($query->getModel(), 'seller')) {
             $query->with('seller');
@@ -48,7 +56,7 @@ Route::get('/', function (Request $request) {
                 break;
         }
 
-        $products = $query->get();
+        $products = $query->paginate(12)->withQueryString();
     } else {
         $products = collect();
     }
@@ -57,7 +65,36 @@ Route::get('/', function (Request $request) {
 })->name('home');
 
 Route::get('/cart', function () {
-    $cart = session('cart', []);
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    if ($userId) {
+        $cartModel = Cart::query()->firstOrCreate(
+            ['user_id' => $userId],
+            ['session_id' => $sessionId]
+        );
+    } else {
+        $cartModel = Cart::query()->firstOrCreate(
+            ['user_id' => null, 'session_id' => $sessionId],
+            ['session_id' => $sessionId]
+        );
+    }
+
+    $items = $cartModel->items()->with('product')->get();
+    $cart = [];
+    foreach ($items as $item) {
+        $p = $item->product;
+        if (!$p) {
+            continue;
+        }
+        $cart[$p->id] = [
+            'id' => $p->id,
+            'name' => $p->name ?? '-',
+            'price' => (float) ($item->price ?? 0),
+            'qty' => (int) ($item->qty ?? 0),
+        ];
+    }
+
     return view('guest.cart', compact('cart'));
 })->name('cart.index');
 
@@ -67,63 +104,164 @@ Route::post('/cart/add/{product}', function (Request $request, $product) {
         return back()->with('error', 'Qty minimal 1');
     }
 
-    $cart = session('cart', []);
-
-    if (class_exists(\App\Models\Product::class)) {
-        $p = \App\Models\Product::query()->find($product);
-        if (!$p) {
-            return back()->with('error', 'Produk tidak ditemukan');
-        }
-
-        $id = $p->id;
-        $cart[$id] = [
-            'id' => $id,
-            'name' => $p->name ?? '-',
-            'price' => (float) ($p->price ?? 0),
-            'qty' => (int) (($cart[$id]['qty'] ?? 0) + $qty),
-        ];
-        session(['cart' => $cart]);
-        return back()->with('success', 'Produk ditambahkan ke cart');
+    $p = Product::query()->find($product);
+    if (!$p) {
+        return back()->with('error', 'Produk tidak ditemukan');
+    }
+    if (($p->status ?? null) !== 'active') {
+        return back()->with('error', 'Produk sedang tidak tersedia');
+    }
+    if (((int) ($p->stock ?? 0)) <= 0) {
+        return back()->with('error', 'Stok produk habis');
     }
 
-    return back()->with('error', 'Model Product belum tersedia');
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    if ($userId) {
+        $cartModel = Cart::query()->firstOrCreate(
+            ['user_id' => $userId],
+            ['session_id' => $sessionId]
+        );
+    } else {
+        $cartModel = Cart::query()->firstOrCreate(
+            ['user_id' => null, 'session_id' => $sessionId],
+            ['session_id' => $sessionId]
+        );
+    }
+
+    $existing = CartItem::query()
+        ->where('cart_id', $cartModel->id)
+        ->where('product_id', $p->id)
+        ->first();
+
+    $newQty = $qty + (int) ($existing?->qty ?? 0);
+    $newQty = min($newQty, (int) ($p->stock ?? 0));
+
+    CartItem::query()->updateOrCreate(
+        ['cart_id' => $cartModel->id, 'product_id' => $p->id],
+        ['qty' => $newQty, 'price' => $p->price]
+    );
+
+    return back()->with('success', 'Produk ditambahkan ke cart');
 })->name('cart.add');
 
 Route::post('/cart/remove/{product}', function ($product) {
-    $cart = session('cart', []);
-    unset($cart[$product]);
-    session(['cart' => $cart]);
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    $cartQuery = Cart::query();
+    if ($userId) {
+        $cartQuery->where('user_id', $userId);
+    } else {
+        $cartQuery->whereNull('user_id')->where('session_id', $sessionId);
+    }
+    $cartModel = $cartQuery->first();
+    if ($cartModel) {
+        CartItem::query()
+            ->where('cart_id', $cartModel->id)
+            ->where('product_id', $product)
+            ->delete();
+    }
     return back()->with('success', 'Item dihapus dari cart');
 })->name('cart.remove');
 
 Route::post('/cart/update', function (Request $request) {
     $items = (array) $request->input('items', []);
-    $cart = session('cart', []);
 
-    foreach ($items as $id => $qty) {
-        $qty = (int) $qty;
-        if (!isset($cart[$id])) {
-            continue;
-        }
-        if ($qty < 1) {
-            unset($cart[$id]);
-            continue;
-        }
-        $cart[$id]['qty'] = $qty;
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    $cartQuery = Cart::query();
+    if ($userId) {
+        $cartQuery->where('user_id', $userId);
+    } else {
+        $cartQuery->whereNull('user_id')->where('session_id', $sessionId);
+    }
+    $cartModel = $cartQuery->first();
+    if (!$cartModel) {
+        return back()->with('success', 'Cart diperbarui');
     }
 
-    session(['cart' => $cart]);
+    foreach ($items as $productId => $qty) {
+        $qty = (int) $qty;
+
+        $cartItem = CartItem::query()
+            ->where('cart_id', $cartModel->id)
+            ->where('product_id', $productId)
+            ->first();
+        if (!$cartItem) {
+            continue;
+        }
+
+        if ($qty < 1) {
+            $cartItem->delete();
+            continue;
+        }
+
+        $product = Product::query()->find($productId);
+        if ($product) {
+            $qty = min($qty, (int) ($product->stock ?? 0));
+            $cartItem->price = $product->price;
+        }
+
+        $cartItem->qty = $qty;
+        $cartItem->save();
+    }
+
     return back()->with('success', 'Cart diperbarui');
 })->name('cart.update');
 
 Route::get('/checkout', function () {
-    $cart = session('cart', []);
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    $cartQuery = Cart::query();
+    if ($userId) {
+        $cartQuery->where('user_id', $userId);
+    } else {
+        $cartQuery->whereNull('user_id')->where('session_id', $sessionId);
+    }
+    $cartModel = $cartQuery->first();
+
+    $cart = [];
+    if ($cartModel) {
+        $items = $cartModel->items()->with('product')->get();
+        foreach ($items as $item) {
+            $p = $item->product;
+            if (!$p) {
+                continue;
+            }
+            $cart[$p->id] = [
+                'id' => $p->id,
+                'name' => $p->name ?? '-',
+                'price' => (float) ($item->price ?? 0),
+                'qty' => (int) ($item->qty ?? 0),
+            ];
+        }
+    }
+
     return view('guest.checkout', compact('cart'));
 })->name('checkout.index');
 
 Route::post('/checkout', function (Request $request) {
-    $cart = session('cart', []);
-    if (empty($cart)) {
+    $sessionId = session()->getId();
+    $userId = Auth::id();
+
+    $cartQuery = Cart::query();
+    if ($userId) {
+        $cartQuery->where('user_id', $userId);
+    } else {
+        $cartQuery->whereNull('user_id')->where('session_id', $sessionId);
+    }
+    $cartModel = $cartQuery->first();
+
+    if (!$cartModel) {
+        return back()->with('error', 'Cart masih kosong');
+    }
+
+    $cartItems = $cartModel->items()->with('product')->get();
+    if ($cartItems->isEmpty()) {
         return back()->with('error', 'Cart masih kosong');
     }
 
@@ -133,7 +271,71 @@ Route::post('/checkout', function (Request $request) {
         'address' => ['required', 'string', 'max:500'],
     ]);
 
-    session()->forget('cart');
+    try {
+        DB::transaction(function () use ($request, $userId, $cartModel, $cartItems) {
+            $subtotal = 0;
+            foreach ($cartItems as $ci) {
+                $product = $ci->product;
+                if (!$product) {
+                    continue;
+                }
+                $lineSubtotal = ((float) ($ci->price ?? 0)) * ((int) ($ci->qty ?? 0));
+                $subtotal += $lineSubtotal;
+            }
+
+            $shipping = 0;
+            $total = $subtotal + $shipping;
+
+            $order = Order::query()->create([
+                'user_id' => $userId,
+                'name' => (string) $request->input('name'),
+                'email' => (string) $request->input('email'),
+                'address' => (string) $request->input('address'),
+                'subtotal' => $subtotal,
+                'shipping' => $shipping,
+                'total' => $total,
+                'status' => 'pending',
+            ]);
+
+            foreach ($cartItems as $ci) {
+                $product = $ci->product;
+                if (!$product) {
+                    continue;
+                }
+
+                $qty = (int) ($ci->qty ?? 0);
+                if ($qty < 1) {
+                    continue;
+                }
+
+                $product->refresh();
+                if (((int) ($product->stock ?? 0)) < $qty) {
+                    throw new \RuntimeException('Stok tidak cukup untuk produk: ' . ($product->name ?? ''));
+                }
+
+                $price = (float) ($ci->price ?? $product->price ?? 0);
+                $lineSubtotal = $price * $qty;
+
+                OrderItem::query()->create([
+                    'order_id' => $order->id,
+                    'product_id' => $product->id,
+                    'product_name' => (string) ($product->name ?? '-'),
+                    'price' => $price,
+                    'qty' => $qty,
+                    'subtotal' => $lineSubtotal,
+                ]);
+
+                $product->stock = (int) ($product->stock ?? 0) - $qty;
+                $product->sold_count = (int) ($product->sold_count ?? 0) + $qty;
+                $product->save();
+            }
+
+            CartItem::query()->where('cart_id', $cartModel->id)->delete();
+        });
+    } catch (\Throwable $e) {
+        return back()->withInput()->with('error', $e->getMessage());
+    }
+
     return redirect()->route('home')->with('success', 'Checkout berhasil (simulasi).');
 })->name('checkout.store');
 

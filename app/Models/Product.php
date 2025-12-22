@@ -13,6 +13,10 @@ class Product extends Model
         'price',
         'stock',
         'status',
+        'description',
+        'rating_avg',
+        'sold_count',
+        'image_url',
     ];
 
     protected $casts = [
@@ -20,6 +24,8 @@ class Product extends Model
         'seller_id' => 'integer',
         'price' => 'decimal:2',
         'stock' => 'integer',
+        'rating_avg' => 'decimal:2',
+        'sold_count' => 'integer',
     ];
 
     public function seller(): BelongsTo
