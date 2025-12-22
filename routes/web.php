@@ -1,17 +1,59 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    $products = class_exists(\App\Models\Product::class)
-        ? \App\Models\Product::query()->when(
-            method_exists((new \App\Models\Product()), 'seller'),
-            fn ($q) => $q->with('seller')
-        )->get()
-        : collect();
+Route::get('/', function (Request $request) {
+    $q = trim((string) $request->query('q', ''));
+    $availability = (string) $request->query('availability', 'all');
+    $sort = (string) $request->query('sort', 'newest');
 
-    return view('guest.home', compact('products'));
+    if (class_exists(\App\Models\Product::class)) {
+        $query = \App\Models\Product::query();
+
+        if (method_exists($query->getModel(), 'seller')) {
+            $query->with('seller');
+        }
+
+        if ($q !== '') {
+            $query->where('name', 'like', '%' . $q . '%');
+        }
+
+        if ($availability === 'in_stock') {
+            $query->where('stock', '>', 0);
+        } elseif ($availability === 'out_of_stock') {
+            $query->where('stock', '<=', 0);
+        }
+
+        switch ($sort) {
+            case 'price_asc':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'price_desc':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'name_desc':
+                $query->orderBy('name', 'desc');
+                break;
+            case 'oldest':
+                $query->orderBy('id', 'asc');
+                break;
+            case 'newest':
+            default:
+                $query->orderBy('id', 'desc');
+                break;
+        }
+
+        $products = $query->get();
+    } else {
+        $products = collect();
+    }
+
+    return view('guest.home', compact('products', 'q', 'availability', 'sort'));
 })->name('home');
 
 Route::get('/cart', function () {
@@ -96,14 +138,79 @@ Route::post('/checkout', function (Request $request) {
 })->name('checkout.store');
 
 Route::get('/login/seller', function () {
-    return redirect()->route('seller.products.index');
-});
+    if (Auth::check()) {
+        $user = Auth::user();
+        if (($user->role ?? null) === 'seller') {
+            return redirect()->route('seller.products.index');
+        }
+        if (($user->role ?? null) === 'superadmin') {
+            return redirect()->route('superadmin.sellers.index');
+        }
+    }
+
+    return view('auth.seller-login');
+})->name('seller.login');
+
+Route::post('/login/seller', function (Request $request) {
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
+    ]);
+
+    if (Auth::attempt($credentials)) {
+        $request->session()->regenerate();
+        $user = Auth::user();
+        if (($user->role ?? null) !== 'seller') {
+            Auth::logout();
+            return back()->withInput()->with('error', 'Akun ini bukan seller.');
+        }
+        return redirect()->route('seller.products.index');
+    }
+
+    return back()->withInput()->with('error', 'Email atau password salah.');
+})->name('seller.login.submit');
 
 Route::get('/login/superadmin', function () {
-    return redirect()->route('superadmin.sellers.index');
-});
+    if (Auth::check()) {
+        $user = Auth::user();
+        if (($user->role ?? null) === 'superadmin') {
+            return redirect()->route('superadmin.sellers.index');
+        }
+        if (($user->role ?? null) === 'seller') {
+            return redirect()->route('seller.products.index');
+        }
+    }
 
-Route::prefix('superadmin')->name('superadmin.')->group(function () {
+    return view('auth.superadmin-login');
+})->name('superadmin.login');
+
+Route::post('/login/superadmin', function (Request $request) {
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
+    ]);
+
+    if (Auth::attempt($credentials)) {
+        $request->session()->regenerate();
+        $user = Auth::user();
+        if (($user->role ?? null) !== 'superadmin') {
+            Auth::logout();
+            return back()->withInput()->with('error', 'Akun ini bukan superadmin.');
+        }
+        return redirect()->route('superadmin.sellers.index');
+    }
+
+    return back()->withInput()->with('error', 'Email atau password salah.');
+})->name('superadmin.login.submit');
+
+Route::post('/logout', function (Request $request) {
+    Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+    return redirect()->route('home');
+})->name('logout');
+
+Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin'])->group(function () {
     Route::prefix('sellers')->name('sellers.')->group(function () {
         Route::get('/', function () {
             $sellers = class_exists(\App\Models\Seller::class)
@@ -198,12 +305,17 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
     });
 });
 
-Route::prefix('seller')->name('seller.')->group(function () {
+Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(function () {
     Route::prefix('products')->name('products.')->group(function () {
         Route::get('/', function () {
-            $products = class_exists(\App\Models\Product::class)
-                ? \App\Models\Product::query()->get()
-                : collect();
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+
+            if (class_exists(\App\Models\Product::class) && $sellerId) {
+                $products = \App\Models\Product::query()->where('seller_id', $sellerId)->get();
+            } else {
+                $products = collect();
+            }
 
             return view('seller.products.index', compact('products'));
         })->name('index');
@@ -213,12 +325,27 @@ Route::prefix('seller')->name('seller.')->group(function () {
         })->name('create');
 
         Route::post('/', function (Request $request) {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId) {
+                return back()->withInput()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            if (class_exists(\App\Models\Seller::class)) {
+                $seller = \App\Models\Seller::query()->find($sellerId);
+                if ($seller && (($seller->status ?? null) === 'inactive')) {
+                    return back()->withInput()->with('error', 'Produk tidak dapat ditambahkan jika seller berstatus Nonaktif.');
+                }
+            }
+
             $validated = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
                 'price' => ['required', 'numeric', 'gt:0'],
                 'stock' => ['required', 'integer', 'min:0'],
                 'status' => ['required', 'in:active,inactive'],
             ]);
+
+            $validated['seller_id'] = $sellerId;
 
             if (class_exists(\App\Models\Product::class)) {
                 try {

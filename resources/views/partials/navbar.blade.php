@@ -45,23 +45,46 @@
                     <a href="{{ $cartHref }}" class="{{ $cartClass }} relative">
                         <i class="fas fa-shopping-cart mr-2"></i>Keranjang
                         {{-- Cart Badge --}}
-                        @if ($cartCount > 0)
-                            <span class="absolute -top-2 -right-4 bg-primary-900 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
-                                {{ $cartCount }}
-                            </span>
-                        @endif
+                        <span class="absolute -top-2 -right-4 bg-primary-900 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                            {{ $cartCount }}
+                        </span>
                     </a>
                 </div>
                 
                 <div class="h-5 w-px bg-gray-300"></div>
                 
                 <div class="flex items-center space-x-4">
-                    <a href="/login/seller" class="{{ $sellerClass }}">
-                        <i class="fas fa-user-tie mr-2"></i>Seller
-                    </a>
-                    <a href="/login/superadmin" class="bg-gradient-to-r from-primary-900 to-primary-800 hover:from-primary-800 hover:to-primary-700 text-white px-5 py-2 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 {{ $isAdminActive ? 'ring-2 ring-primary-200' : '' }}">
-                        <i class="fas fa-shield-alt mr-2"></i>Admin
-                    </a>
+                    @auth
+                        @php
+                            $dashboardHref = '/';
+                            if ((auth()->user()->role ?? null) === 'seller') {
+                                $dashboardHref = Route::has('seller.products.index') ? route('seller.products.index') : url('/seller/products');
+                            }
+                            if ((auth()->user()->role ?? null) === 'superadmin') {
+                                $dashboardHref = Route::has('superadmin.sellers.index') ? route('superadmin.sellers.index') : url('/superadmin/sellers');
+                            }
+
+                            $logoutAction = Route::has('logout') ? route('logout') : url('/logout');
+                        @endphp
+
+                        <a href="{{ $dashboardHref }}" class="text-gray-700 hover:text-primary-900 transition-colors duration-200 font-semibold">
+                            <i class="fas fa-gauge mr-2"></i>Dashboard
+                        </a>
+
+                        <form method="POST" action="{{ $logoutAction }}">
+                            @csrf
+                            <button type="submit" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                                <i class="fas fa-right-from-bracket mr-2"></i>Logout
+                            </button>
+                        </form>
+                    @else
+                        <a href="/login/seller" class="{{ $sellerClass }}">
+                            <i class="fas fa-user-tie mr-2"></i>Seller
+                        </a>
+                        <a href="/login/superadmin" class="bg-gradient-to-r from-primary-900 to-primary-800 hover:from-primary-800 hover:to-primary-700 text-white px-5 py-2 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 {{ $isAdminActive ? 'ring-2 ring-primary-200' : '' }}">
+                            <i class="fas fa-shield-alt mr-2"></i>Admin
+                        </a>
+                    @endauth
                 </div>
             </div>
 
@@ -81,19 +104,44 @@
                 <a href="{{ $cartHref }}" class="{{ $mobileItemBase }} {{ $isCartActive ? $mobileActive : $mobileInactive }}">
                     <i class="fas fa-shopping-cart w-6 mr-3"></i>
                     <span class="font-medium">Keranjang</span>
-                    @if ($cartCount > 0)
-                        <span class="ml-auto bg-primary-900 text-white text-xs rounded-full h-6 min-w-6 px-2 flex items-center justify-center">{{ $cartCount }}</span>
-                    @endif
+                    <span class="ml-auto bg-primary-900 text-white text-xs rounded-full h-6 min-w-6 px-2 flex items-center justify-center">{{ $cartCount }}</span>
                 </a>
                 <div class="border-t border-gray-200 pt-4 mt-2">
-                    <a href="/login/seller" class="{{ $mobileItemBase }} {{ $isSellerActive ? $mobileActive : $mobileInactive }} mb-3">
-                        <i class="fas fa-user-tie w-6 mr-3"></i>
-                        <span class="font-medium">Login Seller</span>
-                    </a>
-                    <a href="/login/superadmin" class="flex items-center bg-primary-900 text-white hover:bg-primary-800 px-4 py-3 rounded-lg font-medium {{ $isAdminActive ? 'ring-2 ring-primary-200' : '' }}">
-                        <i class="fas fa-shield-alt w-6 mr-3"></i>
-                        <span>Super Admin</span>
-                    </a>
+                    @auth
+                        @php
+                            $dashboardHref = '/';
+                            if ((auth()->user()->role ?? null) === 'seller') {
+                                $dashboardHref = Route::has('seller.products.index') ? route('seller.products.index') : url('/seller/products');
+                            }
+                            if ((auth()->user()->role ?? null) === 'superadmin') {
+                                $dashboardHref = Route::has('superadmin.sellers.index') ? route('superadmin.sellers.index') : url('/superadmin/sellers');
+                            }
+
+                            $logoutAction = Route::has('logout') ? route('logout') : url('/logout');
+                        @endphp
+
+                        <a href="{{ $dashboardHref }}" class="{{ $mobileItemBase }} {{ $mobileInactive }} mb-3">
+                            <i class="fas fa-gauge w-6 mr-3"></i>
+                            <span class="font-medium">Dashboard</span>
+                        </a>
+
+                        <form method="POST" action="{{ $logoutAction }}">
+                            @csrf
+                            <button type="submit" class="w-full flex items-center bg-primary-900 text-white hover:bg-primary-800 px-4 py-3 rounded-lg font-medium">
+                                <i class="fas fa-right-from-bracket w-6 mr-3"></i>
+                                <span>Logout</span>
+                            </button>
+                        </form>
+                    @else
+                        <a href="/login/seller" class="{{ $mobileItemBase }} {{ $isSellerActive ? $mobileActive : $mobileInactive }} mb-3">
+                            <i class="fas fa-user-tie w-6 mr-3"></i>
+                            <span class="font-medium">Login Seller</span>
+                        </a>
+                        <a href="/login/superadmin" class="flex items-center bg-primary-900 text-white hover:bg-primary-800 px-4 py-3 rounded-lg font-medium {{ $isAdminActive ? 'ring-2 ring-primary-200' : '' }}">
+                            <i class="fas fa-shield-alt w-6 mr-3"></i>
+                            <span>Super Admin</span>
+                        </a>
+                    @endauth
                 </div>
             </div>
         </div>

@@ -3,6 +3,13 @@
 @section('title', 'Marketplace - Temukan Produk Terbaik')
 
 @section('content')
+@php
+    $q = $q ?? request('q', '');
+    $availability = $availability ?? request('availability', 'all');
+    $sort = $sort ?? request('sort', 'newest');
+    $hasQuery = (string)$q !== '' || (string)$availability !== 'all' || (string)$sort !== 'newest';
+@endphp
+
 <div class="container mx-auto px-4 lg:px-8 py-8">
     {{-- Hero Section --}}
     <div class="rounded-2xl bg-gradient-to-r from-primary-900 via-primary-800 to-primary-700 p-6 md:p-10 mb-8 md:mb-12 shadow-xl">
@@ -10,34 +17,73 @@
             <h1 class="text-3xl md:text-4xl font-bold text-white mb-4">Temukan Produk Terbaik</h1>
             <p class="text-lg text-primary-100 mb-6">Marketplace terpercaya dengan ribuan produk dari seller berkualitas</p>
             
-            {{-- Search Bar --}}
-            <div class="relative max-w-xl">
-                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <i class="fas fa-search text-gray-400"></i>
+            <form method="GET" action="{{ Route::has('home') ? route('home') : url('/') }}" class="space-y-3">
+                {{-- Search Bar --}}
+                <div class="relative max-w-xl">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-300"></i>
+                    </div>
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ $q }}"
+                        placeholder="Cari produk (contoh: kaos, sepatu, hoodie)"
+                        class="w-full pl-12 pr-24 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
+                    >
+                    <button type="submit" class="absolute right-2 top-2 bg-white text-primary-900 hover:bg-gray-100 px-4 py-1.5 rounded-md font-semibold transition-colors">
+                        Cari
+                    </button>
                 </div>
-                <input 
-                    type="text" 
-                    placeholder="Cari produk terbaik..."
-                    class="w-full pl-12 pr-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent"
-                >
-                <button class="absolute right-2 top-2 bg-white text-primary-900 hover:bg-gray-100 px-4 py-1.5 rounded-md font-medium transition-colors">
-                    Cari
-                </button>
-            </div>
+
+                {{-- Inline controls (mobile friendly) --}}
+                <div class="max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-white/80 mb-1">Ketersediaan</label>
+                        <select name="availability" class="w-full rounded-lg bg-white/90 border border-white/20 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
+                            <option value="all" {{ $availability === 'all' ? 'selected' : '' }}>Semua</option>
+                            <option value="in_stock" {{ $availability === 'in_stock' ? 'selected' : '' }}>Tersedia</option>
+                            <option value="out_of_stock" {{ $availability === 'out_of_stock' ? 'selected' : '' }}>Habis</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-white/80 mb-1">Urutkan</label>
+                        <select name="sort" class="w-full rounded-lg bg-white/90 border border-white/20 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-white/50">
+                            <option value="newest" {{ $sort === 'newest' ? 'selected' : '' }}>Terbaru</option>
+                            <option value="oldest" {{ $sort === 'oldest' ? 'selected' : '' }}>Terlama</option>
+                            <option value="price_asc" {{ $sort === 'price_asc' ? 'selected' : '' }}>Harga Termurah</option>
+                            <option value="price_desc" {{ $sort === 'price_desc' ? 'selected' : '' }}>Harga Termahal</option>
+                            <option value="name_asc" {{ $sort === 'name_asc' ? 'selected' : '' }}>Nama A-Z</option>
+                            <option value="name_desc" {{ $sort === 'name_desc' ? 'selected' : '' }}>Nama Z-A</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if ($hasQuery)
+                    <div class="max-w-xl">
+                        <a href="{{ Route::has('home') ? route('home') : url('/') }}" class="inline-flex items-center text-sm font-semibold text-white/90 hover:text-white">
+                            <i class="fas fa-xmark mr-2"></i>
+                            Reset filter
+                        </a>
+                    </div>
+                @endif
+            </form>
         </div>
     </div>
 
     {{-- Products Grid --}}
     <div class="mb-8">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-900">Produk Terbaru</h2>
-            <div class="flex space-x-2">
-                <button class="px-4 py-2 text-sm font-medium text-primary-900 bg-primary-50 rounded-lg hover:bg-primary-100">
-                    <i class="fas fa-filter mr-2"></i>Filter
-                </button>
-                <button class="px-4 py-2 text-sm font-medium text-primary-900 bg-primary-50 rounded-lg hover:bg-primary-100">
-                    <i class="fas fa-sort mr-2"></i>Urutkan
-                </button>
+            <div class="text-sm text-gray-600">
+                @if ($hasQuery)
+                    Menampilkan hasil untuk:
+                    @if ((string)$q !== '')
+                        <span class="font-semibold text-primary-900">"{{ $q }}"</span>
+                    @endif
+                @else
+                    Jelajahi produk terbaru.
+                @endif
             </div>
         </div>
 
@@ -152,11 +198,19 @@
                         <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-primary-50 flex items-center justify-center">
                             <i class="fas fa-box-open text-primary-900 text-3xl"></i>
                         </div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">Belum ada produk</h3>
-                        <p class="text-gray-600 mb-6">Produk akan segera tersedia</p>
-                        <button class="bg-primary-900 hover:bg-primary-800 text-white font-medium px-6 py-3 rounded-lg transition-colors">
-                            <i class="fas fa-redo-alt mr-2"></i>Refresh Halaman
-                        </button>
+                        @if ($hasQuery)
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Tidak ada hasil</h3>
+                            <p class="text-gray-600 mb-6">Coba ubah kata kunci, filter, atau urutan.</p>
+                            <a href="{{ Route::has('home') ? route('home') : url('/') }}" class="inline-flex items-center bg-primary-900 hover:bg-primary-800 text-white font-medium px-6 py-3 rounded-lg transition-colors">
+                                <i class="fas fa-rotate-left mr-2"></i>Reset Filter
+                            </a>
+                        @else
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Belum ada produk</h3>
+                            <p class="text-gray-600 mb-6">Produk akan segera tersedia. Kamu tetap bisa coba fitur search dan urutkan.</p>
+                            <a href="{{ Route::has('home') ? route('home') : url('/') }}" class="inline-flex items-center bg-primary-900 hover:bg-primary-800 text-white font-medium px-6 py-3 rounded-lg transition-colors">
+                                <i class="fas fa-rotate mr-2"></i>Refresh
+                            </a>
+                        @endif
                     </div>
                 </div>
             @endforelse
