@@ -8,7 +8,9 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\Rule;
 
 Route::get('/', function (Request $request) {
     $q = trim((string) $request->query('q', ''));
@@ -99,19 +101,32 @@ Route::get('/cart', function () {
 })->name('cart.index');
 
 Route::post('/cart/add/{product}', function (Request $request, $product) {
+    $wantsJson = $request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest';
     $qty = (int) $request->input('qty', 1);
     if ($qty < 1) {
+        if ($wantsJson) {
+            return response()->json(['message' => 'Qty minimal 1'], 422);
+        }
         return back()->with('error', 'Qty minimal 1');
     }
 
     $p = Product::query()->find($product);
     if (!$p) {
+        if ($wantsJson) {
+            return response()->json(['message' => 'Produk tidak ditemukan'], 404);
+        }
         return back()->with('error', 'Produk tidak ditemukan');
     }
     if (($p->status ?? null) !== 'active') {
+        if ($wantsJson) {
+            return response()->json(['message' => 'Produk sedang tidak tersedia'], 422);
+        }
         return back()->with('error', 'Produk sedang tidak tersedia');
     }
     if (((int) ($p->stock ?? 0)) <= 0) {
+        if ($wantsJson) {
+            return response()->json(['message' => 'Stok produk habis'], 422);
+        }
         return back()->with('error', 'Stok produk habis');
     }
 
@@ -143,10 +158,22 @@ Route::post('/cart/add/{product}', function (Request $request, $product) {
         ['qty' => $newQty, 'price' => $p->price]
     );
 
+    if ($wantsJson) {
+        $cartCount = (int) CartItem::query()
+            ->where('cart_id', $cartModel->id)
+            ->sum('qty');
+
+        return response()->json([
+            'message' => 'Produk ditambahkan ke cart',
+            'cartCount' => $cartCount,
+        ]);
+    }
+
     return back()->with('success', 'Produk ditambahkan ke cart');
 })->name('cart.add');
 
 Route::post('/cart/remove/{product}', function ($product) {
+    $wantsJson = request()->expectsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest';
     $sessionId = session()->getId();
     $userId = Auth::id();
 
@@ -163,10 +190,67 @@ Route::post('/cart/remove/{product}', function ($product) {
             ->where('product_id', $product)
             ->delete();
     }
+
+    if ($wantsJson) {
+        if (!$cartModel) {
+            return response()->json([
+                'message' => 'Item dihapus dari cart',
+                'cartCount' => 0,
+                'itemLines' => 0,
+                'subtotal' => 0,
+                'shipping' => 0,
+                'total' => 0,
+                'items' => (object) [],
+            ]);
+        }
+
+        $cartItems = $cartModel->items()->with('product')->get();
+
+        $payloadItems = [];
+        $subtotal = 0;
+        $cartCount = 0;
+        $itemLines = 0;
+
+        foreach ($cartItems as $ci) {
+            $p = $ci->product;
+            if (!$p) {
+                continue;
+            }
+
+            $qty = (int) ($ci->qty ?? 0);
+            $price = (float) ($ci->price ?? 0);
+            $lineSubtotal = $price * $qty;
+
+            $itemLines++;
+            $cartCount += $qty;
+            $subtotal += $lineSubtotal;
+
+            $payloadItems[$p->id] = [
+                'qty' => $qty,
+                'price' => $price,
+                'subtotal' => $lineSubtotal,
+            ];
+        }
+
+        $shipping = 0;
+        $total = $subtotal + $shipping;
+
+        return response()->json([
+            'message' => 'Item dihapus dari cart',
+            'cartCount' => $cartCount,
+            'itemLines' => $itemLines,
+            'subtotal' => $subtotal,
+            'shipping' => $shipping,
+            'total' => $total,
+            'items' => $payloadItems,
+        ]);
+    }
+
     return back()->with('success', 'Item dihapus dari cart');
 })->name('cart.remove');
 
 Route::post('/cart/update', function (Request $request) {
+    $wantsJson = $request->expectsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest';
     $items = (array) $request->input('items', []);
 
     $sessionId = session()->getId();
@@ -180,6 +264,17 @@ Route::post('/cart/update', function (Request $request) {
     }
     $cartModel = $cartQuery->first();
     if (!$cartModel) {
+        if ($wantsJson) {
+            return response()->json([
+                'message' => 'Cart diperbarui',
+                'cartCount' => 0,
+                'itemLines' => 0,
+                'subtotal' => 0,
+                'shipping' => 0,
+                'total' => 0,
+                'items' => (object) [],
+            ]);
+        }
         return back()->with('success', 'Cart diperbarui');
     }
 
@@ -207,6 +302,49 @@ Route::post('/cart/update', function (Request $request) {
 
         $cartItem->qty = $qty;
         $cartItem->save();
+    }
+
+    if ($wantsJson) {
+        $cartItems = $cartModel->items()->with('product')->get();
+
+        $payloadItems = [];
+        $subtotal = 0;
+        $cartCount = 0;
+        $itemLines = 0;
+
+        foreach ($cartItems as $ci) {
+            $product = $ci->product;
+            if (!$product) {
+                continue;
+            }
+
+            $qty = (int) ($ci->qty ?? 0);
+            $price = (float) ($ci->price ?? 0);
+            $lineSubtotal = $price * $qty;
+
+            $itemLines++;
+            $cartCount += $qty;
+            $subtotal += $lineSubtotal;
+
+            $payloadItems[$product->id] = [
+                'qty' => $qty,
+                'price' => $price,
+                'subtotal' => $lineSubtotal,
+            ];
+        }
+
+        $shipping = 0;
+        $total = $subtotal + $shipping;
+
+        return response()->json([
+            'message' => 'Cart diperbarui',
+            'cartCount' => $cartCount,
+            'itemLines' => $itemLines,
+            'subtotal' => $subtotal,
+            'shipping' => $shipping,
+            'total' => $total,
+            'items' => $payloadItems,
+        ]);
     }
 
     return back()->with('success', 'Cart diperbarui');
@@ -429,13 +567,30 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
         Route::post('/', function (Request $request) {
             $validated = $request->validate([
                 'name' => ['required', 'string', 'max:255'],
-                'email' => ['required', 'email', 'max:255'],
+                'email' => ['required', 'email', 'max:255', 'unique:sellers,email', 'unique:users,email'],
                 'status' => ['required', 'in:active,inactive'],
+                'password' => ['required', 'string', 'min:6', 'confirmed'],
             ]);
 
             if (class_exists(\App\Models\Seller::class)) {
                 try {
-                    \App\Models\Seller::query()->create($validated);
+                    DB::transaction(function () use ($validated) {
+                        $sellerModel = \App\Models\Seller::query()->create([
+                            'name' => $validated['name'],
+                            'email' => $validated['email'],
+                            'status' => $validated['status'],
+                        ]);
+
+                        if (class_exists(\App\Models\User::class)) {
+                            \App\Models\User::query()->create([
+                                'name' => $validated['name'],
+                                'email' => $validated['email'],
+                                'password' => Hash::make($validated['password']),
+                                'role' => 'seller',
+                                'seller_id' => $sellerModel->id,
+                            ]);
+                        }
+                    });
                 } catch (\Throwable $e) {
                     return back()->withInput()->with('error', $e->getMessage());
                 }
@@ -443,6 +598,121 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
 
             return redirect()->route('superadmin.sellers.index')->with('success', 'Seller berhasil disimpan');
         })->name('store');
+
+        Route::get('/{seller}/edit', function ($seller) {
+            if (!class_exists(\App\Models\Seller::class)) {
+                abort(404);
+            }
+
+            $sellerModel = \App\Models\Seller::query()->find($seller);
+            if (!$sellerModel) {
+                abort(404);
+            }
+
+            return view('superadmin.sellers.edit', ['seller' => $sellerModel]);
+        })->name('edit');
+
+        Route::put('/{seller}', function (Request $request, $seller) {
+            if (!class_exists(\App\Models\Seller::class)) {
+                abort(404);
+            }
+
+            $sellerModel = \App\Models\Seller::query()->find($seller);
+            if (!$sellerModel) {
+                abort(404);
+            }
+
+            $linkedUser = null;
+            if (class_exists(\App\Models\User::class)) {
+                $linkedUser = \App\Models\User::query()
+                    ->where('seller_id', $sellerModel->id)
+                    ->where('role', 'seller')
+                    ->first();
+            }
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'email', 'max:255', Rule::unique('sellers', 'email')->ignore($sellerModel->id)],
+                'status' => ['required', 'in:active,inactive'],
+                'password' => ['nullable', 'string', 'min:6', 'confirmed'],
+            ]);
+
+            if (class_exists(\App\Models\User::class)) {
+                $emailUsedByOther = \App\Models\User::query()
+                    ->where('email', $validated['email'])
+                    ->when($linkedUser, function ($q) use ($linkedUser) {
+                        $q->where('id', '!=', $linkedUser->id);
+                    })
+                    ->exists();
+                if ($emailUsedByOther) {
+                    return back()->withInput()->withErrors([
+                        'email' => 'Email sudah digunakan untuk akun lain.',
+                    ]);
+                }
+            }
+
+            try {
+                DB::transaction(function () use ($validated, $sellerModel, $linkedUser) {
+                    $sellerModel->fill($validated);
+                    $sellerModel->save();
+
+                    if (!class_exists(\App\Models\User::class)) {
+                        return;
+                    }
+
+                    $user = $linkedUser;
+                    if ($user) {
+                        $user->name = $validated['name'];
+                        $user->email = $validated['email'];
+                        $user->role = 'seller';
+                        $user->seller_id = $sellerModel->id;
+                        if (!empty($validated['password'])) {
+                            $user->password = Hash::make($validated['password']);
+                        }
+                        $user->save();
+                        return;
+                    }
+
+                    if (empty($validated['password'])) {
+                        throw new \RuntimeException('Seller ini belum memiliki akun. Isi password untuk membuat akun seller.');
+                    }
+
+                    \App\Models\User::query()->create([
+                        'name' => $validated['name'],
+                        'email' => $validated['email'],
+                        'password' => Hash::make((string) $validated['password']),
+                        'role' => 'seller',
+                        'seller_id' => $sellerModel->id,
+                    ]);
+                });
+            } catch (\Throwable $e) {
+                return back()->withInput()->with('error', $e->getMessage());
+            }
+
+            return redirect()->route('superadmin.sellers.index')->with('success', 'Seller berhasil diperbarui');
+        })->name('update');
+
+        Route::delete('/{seller}', function ($seller) {
+            if (!class_exists(\App\Models\Seller::class)) {
+                abort(404);
+            }
+
+            $sellerModel = \App\Models\Seller::query()->find($seller);
+            if (!$sellerModel) {
+                abort(404);
+            }
+
+            if (class_exists(\App\Models\User::class)) {
+                \App\Models\User::query()
+                    ->where('seller_id', $sellerModel->id)
+                    ->where('role', 'seller')
+                    ->delete();
+            }
+
+            $sellerModel->delete();
+
+            return redirect()->route('superadmin.sellers.index')->with('success', 'Seller berhasil dihapus');
+        })->name('destroy');
     });
 
     Route::prefix('products')->name('products.')->group(function () {
@@ -482,6 +752,8 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
                 'price' => ['required', 'numeric', 'gt:0'],
                 'stock' => ['required', 'integer', 'min:0'],
                 'status' => ['required', 'in:active,inactive'],
+                'description' => ['nullable', 'string'],
+                'image_url' => ['nullable', 'string', 'max:2048'],
             ]);
 
             if (class_exists(\App\Models\Seller::class) && class_exists(\App\Models\Product::class)) {
@@ -504,10 +776,124 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['role:superadmin']
 
             return redirect()->route('superadmin.products.index')->with('success', 'Produk berhasil disimpan');
         })->name('store');
+
+        Route::get('/{product}/edit', function ($product) {
+            if (!class_exists(\App\Models\Product::class)) {
+                abort(404);
+            }
+
+            $productModel = \App\Models\Product::query()->find($product);
+            if (!$productModel) {
+                abort(404);
+            }
+
+            $sellers = class_exists(\App\Models\Seller::class)
+                ? \App\Models\Seller::query()->get()
+                : collect();
+
+            return view('superadmin.products.edit', ['product' => $productModel, 'sellers' => $sellers]);
+        })->name('edit');
+
+        Route::put('/{product}', function (Request $request, $product) {
+            if (!class_exists(\App\Models\Product::class)) {
+                abort(404);
+            }
+
+            $productModel = \App\Models\Product::query()->find($product);
+            if (!$productModel) {
+                abort(404);
+            }
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'seller_id' => ['required', 'integer'],
+                'price' => ['required', 'numeric', 'gt:0'],
+                'stock' => ['required', 'integer', 'min:0'],
+                'status' => ['required', 'in:active,inactive'],
+                'description' => ['nullable', 'string'],
+                'image_url' => ['nullable', 'string', 'max:2048'],
+            ]);
+
+            if (class_exists(\App\Models\Seller::class)) {
+                $seller = \App\Models\Seller::query()->find($validated['seller_id']);
+                if (!$seller) {
+                    return back()->withInput()->withErrors([
+                        'seller_id' => 'Seller tidak ditemukan.',
+                    ]);
+                }
+
+                $sellerStatus = $seller->status ?? null;
+                $isInactive = $sellerStatus === 'inactive' || $sellerStatus === 'Nonaktif';
+                if ($isInactive) {
+                    return back()->withInput()->withErrors([
+                        'seller_id' => 'Produk tidak dapat dipindahkan/disimpan ke seller berstatus Nonaktif.',
+                    ]);
+                }
+            }
+
+            $productModel->fill($validated);
+            $productModel->save();
+
+            return redirect()->route('superadmin.products.index')->with('success', 'Produk berhasil diperbarui');
+        })->name('update');
+
+        Route::delete('/{product}', function ($product) {
+            if (!class_exists(\App\Models\Product::class)) {
+                abort(404);
+            }
+
+            $productModel = \App\Models\Product::query()->find($product);
+            if (!$productModel) {
+                abort(404);
+            }
+
+            $productModel->delete();
+
+            return redirect()->route('superadmin.products.index')->with('success', 'Produk berhasil dihapus');
+        })->name('destroy');
     });
 });
 
 Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(function () {
+    Route::prefix('store')->name('store.')->group(function () {
+        Route::get('/', function () {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId || !class_exists(\App\Models\Seller::class)) {
+                return back()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            $seller = \App\Models\Seller::query()->find($sellerId);
+            if (!$seller) {
+                return back()->with('error', 'Data toko tidak ditemukan.');
+            }
+
+            return view('seller.store.edit', compact('seller'));
+        })->name('edit');
+
+        Route::put('/', function (Request $request) {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId || !class_exists(\App\Models\Seller::class)) {
+                return back()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            $seller = \App\Models\Seller::query()->find($sellerId);
+            if (!$seller) {
+                return back()->with('error', 'Data toko tidak ditemukan.');
+            }
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+            ]);
+
+            $seller->name = $validated['name'];
+            $seller->save();
+
+            return back()->with('success', 'Toko berhasil diperbarui');
+        })->name('update');
+    });
+
     Route::prefix('products')->name('products.')->group(function () {
         Route::get('/', function () {
             $user = Auth::user();
@@ -519,7 +905,12 @@ Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(fun
                 $products = collect();
             }
 
-            return view('seller.products.index', compact('products'));
+            $seller = null;
+            if (class_exists(\App\Models\Seller::class) && $sellerId) {
+                $seller = \App\Models\Seller::query()->find($sellerId);
+            }
+
+            return view('seller.products.index', compact('products', 'seller'));
         })->name('index');
 
         Route::get('/create', function () {
@@ -545,6 +936,8 @@ Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(fun
                 'price' => ['required', 'numeric', 'gt:0'],
                 'stock' => ['required', 'integer', 'min:0'],
                 'status' => ['required', 'in:active,inactive'],
+                'description' => ['nullable', 'string'],
+                'image_url' => ['nullable', 'string', 'max:2048'],
             ]);
 
             $validated['seller_id'] = $sellerId;
@@ -559,5 +952,76 @@ Route::prefix('seller')->name('seller.')->middleware(['role:seller'])->group(fun
 
             return redirect()->route('seller.products.index')->with('success', 'Produk berhasil disimpan');
         })->name('store');
+
+        Route::get('/{product}/edit', function ($product) {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId || !class_exists(\App\Models\Product::class)) {
+                return back()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            $productModel = \App\Models\Product::query()
+                ->where('seller_id', $sellerId)
+                ->where('id', $product)
+                ->first();
+
+            if (!$productModel) {
+                abort(404);
+            }
+
+            return view('seller.products.edit', ['product' => $productModel]);
+        })->name('edit');
+
+        Route::put('/{product}', function (Request $request, $product) {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId || !class_exists(\App\Models\Product::class)) {
+                return back()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            $productModel = \App\Models\Product::query()
+                ->where('seller_id', $sellerId)
+                ->where('id', $product)
+                ->first();
+
+            if (!$productModel) {
+                abort(404);
+            }
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'price' => ['required', 'numeric', 'gt:0'],
+                'stock' => ['required', 'integer', 'min:0'],
+                'status' => ['required', 'in:active,inactive'],
+                'description' => ['nullable', 'string'],
+                'image_url' => ['nullable', 'string', 'max:2048'],
+            ]);
+
+            $productModel->fill($validated);
+            $productModel->save();
+
+            return redirect()->route('seller.products.index')->with('success', 'Produk berhasil diperbarui');
+        })->name('update');
+
+        Route::delete('/{product}', function ($product) {
+            $user = Auth::user();
+            $sellerId = $user?->seller_id;
+            if (!$sellerId || !class_exists(\App\Models\Product::class)) {
+                return back()->with('error', 'Seller belum terhubung dengan akun ini.');
+            }
+
+            $productModel = \App\Models\Product::query()
+                ->where('seller_id', $sellerId)
+                ->where('id', $product)
+                ->first();
+
+            if (!$productModel) {
+                abort(404);
+            }
+
+            $productModel->delete();
+
+            return redirect()->route('seller.products.index')->with('success', 'Produk berhasil dihapus');
+        })->name('destroy');
     });
 });

@@ -69,10 +69,10 @@
                     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <div class="font-bold text-gray-900">Item di Keranjang</div>
-                            <div class="text-sm text-gray-500">{{ count($cart ?? []) }} item</div>
+                            <div class="text-sm text-gray-500"><span data-cart-item-lines>{{ count($cart ?? []) }}</span> item</div>
                         </div>
 
-                        <form method="POST" action="{{ $updateAction }}">
+                        <form method="POST" action="{{ $updateAction }}" class="js-cart-update">
                             @csrf
 
                             <div class="hidden md:block overflow-x-auto">
@@ -97,7 +97,7 @@
                                                     ? route('cart.remove', ['product' => $item['id']])
                                                     : url('/cart/remove/' . ($item['id'] ?? 0));
                                             @endphp
-                                            <tr>
+                                            <tr data-cart-item-row="{{ $item['id'] }}">
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center gap-4">
                                                         <div class="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -118,11 +118,12 @@
                                                         min="1"
                                                         name="items[{{ $item['id'] }}]"
                                                         value="{{ $qty > 0 ? $qty : 1 }}"
+                                                        data-cart-item-qty="{{ $item['id'] }}"
                                                         class="w-24 rounded-lg border-gray-300 text-sm focus:border-primary-900 focus:ring-primary-900"
                                                     />
                                                 </td>
                                                 <td class="px-6 py-4 font-semibold text-gray-900">
-                                                    Rp {{ number_format((int)$subtotal, 0, ',', '.') }}
+                                                    <span data-cart-item-subtotal="{{ $item['id'] }}">Rp {{ number_format((int)$subtotal, 0, ',', '.') }}</span>
                                                 </td>
                                                 <td class="px-6 py-4 text-right">
                                                     <button
@@ -152,7 +153,7 @@
                                             : url('/cart/remove/' . ($item['id'] ?? 0));
                                     @endphp
 
-                                    <div class="p-5">
+                                    <div class="p-5" data-cart-item-row="{{ $item['id'] }}">
                                         <div class="flex items-start justify-between gap-4">
                                             <div class="flex items-center gap-3">
                                                 <div class="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -181,7 +182,7 @@
                                             </div>
                                             <div class="rounded-xl bg-gray-50 p-3">
                                                 <div class="text-xs text-gray-500">Subtotal</div>
-                                                <div class="font-semibold text-gray-900">Rp {{ number_format((int)$subtotal, 0, ',', '.') }}</div>
+                                                <div class="font-semibold text-gray-900" data-cart-item-subtotal="{{ $item['id'] }}">Rp {{ number_format((int)$subtotal, 0, ',', '.') }}</div>
                                             </div>
                                         </div>
 
@@ -192,6 +193,7 @@
                                                 min="1"
                                                 name="items[{{ $item['id'] }}]"
                                                 value="{{ $qty > 0 ? $qty : 1 }}"
+                                                data-cart-item-qty="{{ $item['id'] }}"
                                                 class="w-full rounded-lg border-gray-300 text-sm focus:border-primary-900 focus:ring-primary-900"
                                             />
                                         </div>
@@ -226,15 +228,15 @@
                         <div class="space-y-3 text-sm">
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600">Subtotal</span>
-                                <span class="font-semibold text-gray-900">Rp {{ number_format((int)$total, 0, ',', '.') }}</span>
+                                <span class="font-semibold text-gray-900" data-cart-summary-subtotal>Rp {{ number_format((int)$total, 0, ',', '.') }}</span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600">Ongkir</span>
-                                <span class="font-semibold text-gray-900">Rp {{ number_format((int)$shipping, 0, ',', '.') }}</span>
+                                <span class="font-semibold text-gray-900" data-cart-summary-shipping>Rp {{ number_format((int)$shipping, 0, ',', '.') }}</span>
                             </div>
                             <div class="border-t pt-3 flex items-center justify-between">
                                 <span class="font-bold text-gray-900">Total</span>
-                                <span class="font-bold text-primary-900">Rp {{ number_format((int)$grandTotal, 0, ',', '.') }}</span>
+                                <span class="font-bold text-primary-900" data-cart-summary-total>Rp {{ number_format((int)$grandTotal, 0, ',', '.') }}</span>
                             </div>
                         </div>
 
@@ -250,4 +252,176 @@
             </div>
         @endif
     </div>
+
+    <div id="js-toast-container" class="fixed top-5 right-5 space-y-3" style="z-index: 9999;"></div>
+
+    <script>
+        (function () {
+            const form = document.querySelector('form.js-cart-update');
+            if (!form) return;
+
+            const showToast = (message, type = 'success') => {
+                let container = document.getElementById('js-toast-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'js-toast-container';
+                    container.className = 'fixed top-5 right-5 space-y-3';
+                    container.style.zIndex = '9999';
+                    document.body.appendChild(container);
+                }
+
+                const isError = type === 'error';
+                const toast = document.createElement('div');
+                toast.className = isError
+                    ? 'w-full max-w-sm rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 shadow-lg transition-opacity duration-200 opacity-100'
+                    : 'w-full max-w-sm rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800 shadow-lg transition-opacity duration-200 opacity-100';
+
+                toast.innerHTML = `
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="text-sm font-semibold">${message}</div>
+                        <button type="button" class="-mr-1 -mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md ${isError ? 'text-red-800/70 hover:text-red-900 hover:bg-red-100' : 'text-green-800/70 hover:text-green-900 hover:bg-green-100'}" aria-label="Tutup">
+                            &times;
+                        </button>
+                    </div>
+                `;
+
+                const removeToast = () => {
+                    toast.classList.remove('opacity-100');
+                    toast.classList.add('opacity-0');
+                    window.setTimeout(() => toast.remove(), 200);
+                };
+
+                const closeBtn = toast.querySelector('button');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', removeToast);
+                }
+
+                container.appendChild(toast);
+                window.setTimeout(removeToast, 5000);
+            };
+
+            const formatRupiah = (value) => {
+                const n = Math.round(Number(value || 0));
+                return 'Rp ' + n.toLocaleString('id-ID');
+            };
+
+            form.addEventListener('submit', async function (e) {
+                const submitter = e.submitter || null;
+                const submitterAction = submitter ? submitter.getAttribute('formaction') : null;
+
+                e.preventDefault();
+
+                if (submitter) {
+                    submitter.disabled = true;
+                }
+
+                try {
+                    const isRemove = !!(submitterAction && submitterAction !== form.action);
+                    const actionUrl = isRemove ? submitterAction : form.action;
+
+                    let disabledForSubmit = [];
+                    let formData;
+
+                    if (isRemove) {
+                        formData = new FormData();
+                        const token = form.querySelector('input[name="_token"]')?.value;
+                        if (token) {
+                            formData.append('_token', token);
+                        }
+                    } else {
+                        const qtyInputs = Array.from(form.querySelectorAll('[data-cart-item-qty]'));
+                        disabledForSubmit = [];
+                        qtyInputs.forEach((input) => {
+                            const isVisible = !!(input.offsetParent) && input.getClientRects().length > 0;
+                            if (!isVisible && !input.disabled) {
+                                input.disabled = true;
+                                disabledForSubmit.push(input);
+                            }
+                        });
+
+                        formData = new FormData(form);
+                    }
+
+                    const res = await fetch(actionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                    });
+
+                    const payload = await res.json().catch(() => null);
+                    if (!res.ok) {
+                        showToast(payload?.message || 'Gagal update cart', 'error');
+                        return;
+                    }
+
+                    showToast(payload?.message || (isRemove ? 'Item dihapus dari cart' : 'Cart diperbarui'));
+
+                    const items = payload?.items || {};
+
+                    document.querySelectorAll('[data-cart-item-row]').forEach(row => {
+                        const id = row.getAttribute('data-cart-item-row');
+                        if (!Object.prototype.hasOwnProperty.call(items, id)) {
+                            row.remove();
+                        }
+                    });
+
+                    document.querySelectorAll('[data-cart-item-subtotal]').forEach(el => {
+                        const id = el.getAttribute('data-cart-item-subtotal');
+                        if (Object.prototype.hasOwnProperty.call(items, id)) {
+                            el.textContent = formatRupiah(items[id].subtotal);
+                        }
+                    });
+
+                    document.querySelectorAll('[data-cart-item-qty]').forEach(el => {
+                        const id = el.getAttribute('data-cart-item-qty');
+                        if (Object.prototype.hasOwnProperty.call(items, id)) {
+                            el.value = items[id].qty;
+                        }
+                    });
+
+                    const itemLinesEl = document.querySelector('[data-cart-item-lines]');
+                    if (itemLinesEl && typeof payload?.itemLines !== 'undefined') {
+                        itemLinesEl.textContent = payload.itemLines;
+                    }
+
+                    const subtotalEl = document.querySelector('[data-cart-summary-subtotal]');
+                    if (subtotalEl && typeof payload?.subtotal !== 'undefined') {
+                        subtotalEl.textContent = formatRupiah(payload.subtotal);
+                    }
+                    const shippingEl = document.querySelector('[data-cart-summary-shipping]');
+                    if (shippingEl && typeof payload?.shipping !== 'undefined') {
+                        shippingEl.textContent = formatRupiah(payload.shipping);
+                    }
+                    const totalEl = document.querySelector('[data-cart-summary-total]');
+                    if (totalEl && typeof payload?.total !== 'undefined') {
+                        totalEl.textContent = formatRupiah(payload.total);
+                    }
+
+                    if (typeof payload?.cartCount !== 'undefined') {
+                        document.querySelectorAll('[data-cart-count-badge]').forEach(el => {
+                            el.textContent = payload.cartCount;
+                        });
+                    }
+
+                    disabledForSubmit.forEach((input) => {
+                        input.disabled = false;
+                    });
+                } catch (err) {
+                    alert('Terjadi kesalahan. Coba lagi.');
+                } finally {
+                    const stillDisabled = Array.from(form.querySelectorAll('[data-cart-item-qty][disabled]'));
+                    stillDisabled.forEach((input) => {
+                        input.disabled = false;
+                    });
+
+                    if (submitter) {
+                        submitter.disabled = false;
+                    }
+                }
+            });
+        })();
+    </script>
 @endsection

@@ -163,7 +163,7 @@
                                 : url('/cart/add/' . ($product->id ?? 0));
                         @endphp
                         
-                        <form method="POST" action="{{ $addAction }}" class="space-y-3">
+                        <form method="POST" action="{{ $addAction }}" class="space-y-3 js-add-to-cart">
                             @csrf
                             <div class="flex items-center space-x-3">
                                 <div class="flex-1">
@@ -232,8 +232,97 @@
     </div>
 </div>
 
+<div id="js-toast-container" class="fixed top-5 right-5 space-y-3" style="z-index: 9999;"></div>
+
 {{-- Quantity Script --}}
 <script>
+    const showToast = (message) => {
+        let container = document.getElementById('js-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'js-toast-container';
+            container.className = 'fixed top-5 right-5 space-y-3';
+            container.style.zIndex = '9999';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'w-full max-w-sm rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800 shadow-lg transition-opacity duration-200 opacity-100';
+        toast.innerHTML = `
+            <div class="flex items-start justify-between gap-4">
+                <div class="text-sm font-semibold">${message}</div>
+                <button type="button" class="-mr-1 -mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-green-800/70 hover:text-green-900 hover:bg-green-100" aria-label="Tutup">
+                    &times;
+                </button>
+            </div>
+        `;
+
+        const removeToast = () => {
+            toast.classList.remove('opacity-100');
+            toast.classList.add('opacity-0');
+            window.setTimeout(() => toast.remove(), 200);
+        };
+
+        const closeBtn = toast.querySelector('button');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', removeToast);
+        }
+
+        container.appendChild(toast);
+        window.setTimeout(removeToast, 5000);
+    };
+
+    window.showToast = showToast;
+
+    document.querySelectorAll('form.js-add-to-cart').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalHtml = submitBtn ? submitBtn.innerHTML : null;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            try {
+                const formData = new FormData(form);
+
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+
+                const payload = await res.json().catch(() => null);
+                if (!res.ok) {
+                    const msg = payload?.message || 'Gagal menambahkan ke keranjang';
+                    alert(msg);
+                    return;
+                }
+
+                if (typeof payload?.cartCount !== 'undefined') {
+                    document.querySelectorAll('[data-cart-count-badge]').forEach(el => {
+                        el.textContent = payload.cartCount;
+                    });
+                }
+
+                showToast('Berhasil masuk keranjang');
+            } catch (err) {
+                alert('Terjadi kesalahan. Coba lagi.');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    if (originalHtml !== null) {
+                        submitBtn.innerHTML = originalHtml;
+                    }
+                }
+            }
+        });
+    });
+
     document.querySelectorAll('.increment-btn').forEach(button => {
         button.addEventListener('click', function() {
             const input = this.parentNode.querySelector('input[name="qty"]');

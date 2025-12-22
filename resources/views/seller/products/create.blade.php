@@ -13,42 +13,59 @@
             : url('/seller/products');
     @endphp
 
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-xl font-semibold">Tambah Produk</h1>
-        <a href="{{ $backHref }}" class="text-sm text-gray-600 hover:text-gray-900">Kembali</a>
+    <div class="rounded-2xl bg-gradient-to-r from-primary-900 via-primary-800 to-primary-700 p-6 md:p-8 mb-6 shadow-xl">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">Tambah Produk</h1>
+                <p class="text-sm text-primary-100">Tambahkan produk baru untuk toko kamu.</p>
+            </div>
+            <a href="{{ $backHref }}" class="inline-flex items-center justify-center rounded-lg bg-white text-primary-900 hover:bg-gray-100 px-4 py-2 text-sm font-semibold">
+                Kembali
+            </a>
+        </div>
     </div>
 
-    <div class="rounded border bg-white p-6">
-        <form method="POST" action="{{ $storeAction }}" class="space-y-4">
+    <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <form method="POST" action="{{ $storeAction }}" class="space-y-5">
             @csrf
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">Nama Produk</label>
-                <input name="name" value="{{ old('name') }}" class="mt-1 w-full rounded border-gray-300 focus:border-gray-900 focus:ring-gray-900" placeholder="Contoh: Kaos Polos" />
+                <label class="block text-sm font-semibold text-gray-700">Nama Produk</label>
+                <input name="name" value="{{ old('name') }}" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900" placeholder="Contoh: Kaos Polos" />
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Harga</label>
-                    <input type="number" step="0.01" name="price" value="{{ old('price') }}" class="mt-1 w-full rounded border-gray-300 focus:border-gray-900 focus:ring-gray-900" placeholder="10000" />
+                    <label class="block text-sm font-semibold text-gray-700">Harga</label>
+                    <input type="number" step="0.01" name="price" value="{{ old('price') }}" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900" placeholder="10000" />
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Stok</label>
-                    <input type="number" name="stock" value="{{ old('stock') }}" class="mt-1 w-full rounded border-gray-300 focus:border-gray-900 focus:ring-gray-900" placeholder="0" />
+                    <label class="block text-sm font-semibold text-gray-700">Stok</label>
+                    <input type="number" name="stock" value="{{ old('stock') }}" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900" placeholder="0" />
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700">Status Produk</label>
-                <select name="status" class="mt-1 w-full rounded border-gray-300 focus:border-gray-900 focus:ring-gray-900">
+                <label class="block text-sm font-semibold text-gray-700">Status Produk</label>
+                <select name="status" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900">
                     <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>Aktif</option>
                     <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>Nonaktif</option>
                 </select>
             </div>
 
+            <div>
+                <label class="block text-sm font-semibold text-gray-700">Deskripsi</label>
+                <textarea name="description" rows="4" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900" placeholder="Deskripsi singkat produk">{{ old('description') }}</textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700">Image URL</label>
+                <input name="image_url" value="{{ old('image_url') }}" class="mt-2 w-full rounded-lg border-gray-300 focus:border-primary-900 focus:ring-primary-900" placeholder="https://..." />
+            </div>
+
             <div class="pt-2">
-                <button type="submit" class="inline-flex items-center rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">
+                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary-900 hover:bg-primary-800 px-5 py-2 text-sm font-semibold text-white">
                     Simpan
                 </button>
             </div>

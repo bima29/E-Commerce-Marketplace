@@ -124,7 +124,7 @@
 
                             <div class="rounded-xl bg-primary-50 border border-primary-100 p-4 text-sm text-gray-700">
                                 <div class="font-semibold text-primary-900 mb-1">Catatan</div>
-                                <div>Checkout pada project ini masih simulasi (tanpa payment gateway).</div>
+                                <div>Checkout pada project ini masih simulasi (tanpa payment gateway) karena hanya untuk tes saja.</div>
                             </div>
 
                             <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">

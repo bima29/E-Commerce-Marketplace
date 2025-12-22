@@ -14,9 +14,21 @@
                 $productsHref = Route::has('home') ? route('home') : url('/');
                 $cartHref = Route::has('cart.index') ? route('cart.index') : url('/cart');
 
-                $cartCount = collect(session('cart', []))->sum(function ($item) {
-                    return (int) ($item['qty'] ?? 0);
-                });
+                $cartCount = 0;
+                $sessionId = session()->getId();
+                $userId = \Illuminate\Support\Facades\Auth::id();
+                $cartQuery = \App\Models\Cart::query();
+                if ($userId) {
+                    $cartQuery->where('user_id', $userId);
+                } else {
+                    $cartQuery->whereNull('user_id')->where('session_id', $sessionId);
+                }
+                $cartModel = $cartQuery->first();
+                if ($cartModel) {
+                    $cartCount = (int) \App\Models\CartItem::query()
+                        ->where('cart_id', $cartModel->id)
+                        ->sum('qty');
+                }
 
                 $isProductsActive = request()->routeIs('home') || request()->is('/');
                 $isCartActive = request()->routeIs('cart.*') || request()->is('cart') || request()->is('cart/*');
@@ -45,7 +57,7 @@
                     <a href="{{ $cartHref }}" class="{{ $cartClass }} relative">
                         <i class="fas fa-shopping-cart mr-2"></i>Keranjang
                         {{-- Cart Badge --}}
-                        <span class="absolute -top-2 -right-4 bg-primary-900 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
+                        <span data-cart-count-badge class="absolute -top-2 -right-4 bg-primary-900 text-white text-xs rounded-full h-5 min-w-5 px-1 flex items-center justify-center">
                             {{ $cartCount }}
                         </span>
                     </a>
@@ -104,7 +116,7 @@
                 <a href="{{ $cartHref }}" class="{{ $mobileItemBase }} {{ $isCartActive ? $mobileActive : $mobileInactive }}">
                     <i class="fas fa-shopping-cart w-6 mr-3"></i>
                     <span class="font-medium">Keranjang</span>
-                    <span class="ml-auto bg-primary-900 text-white text-xs rounded-full h-6 min-w-6 px-2 flex items-center justify-center">{{ $cartCount }}</span>
+                    <span data-cart-count-badge class="ml-auto bg-primary-900 text-white text-xs rounded-full h-6 min-w-6 px-2 flex items-center justify-center">{{ $cartCount }}</span>
                 </a>
                 <div class="border-t border-gray-200 pt-4 mt-2">
                     @auth
