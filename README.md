@@ -356,17 +356,19 @@ Karena `price` wajib **lebih besar dari 0** (`gt:0`).
 
 ## Screenshot aplikasi (wajib diisi)
 
-Simpan screenshot di folder (contoh): `docs/screenshots/` lalu update link markdown di bawah.
+Screenshot di bawah menggunakan file yang sudah ada di root project.
 
 ### 1) Halaman daftar seller
 
-![Halaman daftar seller](docs/screenshots/01-superadmin-sellers-index.png)
+![Halaman daftar seller](daftar_seller.png)
 
 ### 2) Halaman daftar produk
 
-![Halaman daftar produk](docs/screenshots/02-superadmin-products-index.png)
+![Halaman daftar produk](daftar_produk.png)
 
 ### 3) Contoh proses tambah data (seller atau produk)
 
-![Proses tambah produk](docs/screenshots/03-seller-products-create.png)
+![Proses tambah produk](tambah_produk.png)
+
+![Proses tambah seller](tambah_seller.png)
 
