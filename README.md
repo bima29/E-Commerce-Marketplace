@@ -1,195 +1,372 @@
-# E-Commerce Marketplace (Mini Project)
 
-Mini project Laravel untuk kebutuhan tes seleksi: modul sederhana **E-Commerce Marketplace** tanpa payment gateway.
+# E-Commerce Marketplace (Laravel)
 
-Fokus utama:
-- **Struktur data** (Seller, Product)
-- **Create + Read**
-- **Validasi & business rule**
+Project ini adalah simulasi marketplace sederhana dengan 3 area utama:
 
----
+- **Guest (pengunjung)**: melihat produk, search/filter/sort, cart, checkout.
+- **Seller**: kelola toko (nama) dan kelola produk milik seller.
+- **Superadmin**: kelola data seller dan produk semua seller.
 
-## Setup & Menjalankan Project
-
-### 1) Install dependency
-```bash
-composer install
-```
-
-### 2) Setup environment
-Copy `.env.example` ke `.env`, lalu set konfigurasi database.
-
-```bash
-php artisan key:generate
-```
-
-### 3) Migrasi + seed
-```bash
-php artisan migrate --seed
-```
-
-### 4) Jalankan aplikasi
-```bash
-php artisan serve
-```
-
-### 5) (Opsional) Jalankan Tailwind via Vite
-```bash
-npm install
-npm run dev
-```
+Seluruh alur utama didefinisikan di `routes/web.php` (menggunakan closure), dengan model Eloquent di `app/Models`, middleware role di `app/Http/Middleware/EnsureRole.php`, dan tampilan Blade di `resources/views`.
 
 ---
 
-## Database & Technical Requirement
+## Cara setup & menjalankan project
 
-Project ini memenuhi requirement teknis berikut:
+### 1) Prasyarat
 
-### 1) Laravel Migration
-- Migration dibuat untuk tabel:
-  - `sellers`
-  - `products`
+- PHP **8.2+**
+- Composer
+- Node.js + npm
+- Database:
+  - **MySQL** (sesuai `.env.example`) atau
+  - **SQLite** (file sudah ada di `database/database.sqlite`)
 
-File:
-- `database/migrations/2025_12_22_000003_create_sellers_table.php`
-- `database/migrations/2025_12_22_000004_create_products_table.php`
+### 2) Instalasi dependency
 
-Struktur tabel:
-- **sellers**
-  - `id`
-  - `name` (Nama Toko)
-  - `email` (unique)
-  - `status` enum: `active|inactive`
-  - timestamps
-- **products**
-  - `id`
-  - `seller_id` (FK -> `sellers.id`, cascade on delete)
-  - `name` (Nama Produk)
-  - `price` (decimal)
-  - `stock` (unsigned integer)
-  - `status` enum: `active|inactive`
-  - timestamps
+Jalankan:
 
-### 2) Eloquent Model & Relationship
-Model yang digunakan:
-- `app/Models/Seller.php`
-- `app/Models/Product.php`
+- `composer install`
+- `npm install`
 
-Relasi:
-- `Seller::products()` => `hasMany(Product::class)`
-- `Product::seller()` => `belongsTo(Seller::class)`
+### 3) Konfigurasi environment
 
-### 3) Laravel Validation
-Validasi dilakukan di layer route handler (closure) saat create data:
+Copy env:
 
-- Seller:
-  - `name`: required, string, max 255
-  - `email`: required, email
-  - `status`: required, in active/inactive
+- `copy .env.example .env`
 
-- Product:
-  - `name`: required, string, max 255
-  - `seller_id`: required, integer
-  - `price`: required, numeric, **gt:0**
-  - `stock`: required, integer, **min:0**
-  - `status`: required, in active/inactive
+Lalu generate key:
 
-### 4) Business Rule
-Business rule yang diterapkan:
-- **Produk tidak dapat ditambahkan jika seller berstatus `inactive`**
-- **Harga produk harus > 0**
-- **Stok tidak boleh negatif**
+- `php artisan key:generate`
 
-Catatan:
-- Rule seller inactive dicek saat create product di route `superadmin.products.store`.
+### 4) Konfigurasi database
 
----
+#### Opsi A: MySQL
 
-## Data Entry Task (Seeder)
+Di `.env` set:
 
-Seeder tersedia dan dipanggil lewat `DatabaseSeeder`.
+- `DB_CONNECTION=mysql`
+- `DB_HOST=127.0.0.1`
+- `DB_PORT=3306`
+- `DB_DATABASE=...`
+- `DB_USERNAME=...`
+- `DB_PASSWORD=...`
 
-File:
-- `database/seeders/SellerSeeder.php`
-- `database/seeders/ProductSeeder.php`
+Lalu jalankan migrasi + seed:
 
-Hasil seeding:
-- **2 Seller aktif**
-- **1 Seller nonaktif**
-- **5 Produk**
+- `php artisan migrate:fresh --seed`
 
-### Contoh data gagal validasi / rule
-Di `ProductSeeder`, ada contoh data yang **disengaja gagal** karena melanggar business rule:
-- Produk mencoba dibuat untuk seller dengan status `inactive`.
+#### Opsi B: SQLite (lebih cepat untuk demo)
 
-Seeder akan menampilkan pesan `Skip seed invalid product: seller status inactive` dan tidak menyimpan data tersebut.
+Pastikan file ada:
+
+- `database/database.sqlite`
+
+Di `.env` set:
+
+- `DB_CONNECTION=sqlite`
+- `DB_DATABASE=database/database.sqlite`
+
+Lalu:
+
+- `php artisan migrate:fresh --seed`
+
+### 5) Menjalankan aplikasi
+
+#### Mode manual
+
+- Backend: `php artisan serve`
+- Frontend (Vite): `npm run dev`
+
+#### Mode cepat via composer script
+
+Project menyediakan script di `composer.json`:
+
+- Setup sekali jalan: `composer run setup`
+- Dev (server + queue + vite): `composer run dev`
+
+Buka:
+
+- `http://127.0.0.1:8000`
 
 ---
 
-## Akun Login (Seed)
+## Akun demo (Seeder)
 
-Setelah menjalankan `php artisan migrate --seed` atau `php artisan migrate:fresh --seed`, akun berikut otomatis dibuat (password sudah di-hash menggunakan `Hash::make(...)`).
+Seeder ada di `database/seeders/*` dan dipanggil oleh `DatabaseSeeder`.
+
+- **Superadmin**
+  - Email: `superadmin@marketplace.test`
+  - Password: `password123`
+  - Login: `/login/superadmin`
+
+- **Seller Alpha**
+  - Email: `seller.alpha@marketplace.test`
+  - Password: `password123`
+  - Login: `/login/seller`
+
+- **Seller Beta**
+  - Email: `seller.beta@marketplace.test`
+  - Password: `password123`
+  - Login: `/login/seller`
+
+Catatan: seeder juga membuat **seller nonaktif** (`inactive@seller.test`) untuk kebutuhan pengujian business rule.
+
+---
+
+## Penjelasan struktur project
+
+- **`routes/web.php`**
+  - Semua route utama guest/seller/superadmin (closure-based)
+  - Validasi request (Laravel validator) dan transaksi DB
+
+- **`app/Models`**
+  - `User`: memiliki kolom `role` dan relasi `seller()`
+  - `Seller`: relasi `products()`
+  - `Product`: relasi `seller()`
+  - `Cart`, `CartItem`: penyimpanan keranjang user/guest (berdasarkan session)
+  - `Order`, `OrderItem`: simulasi checkout (membuat order + mengurangi stok)
+
+- **`app/Http/Middleware/EnsureRole.php`**
+  - Middleware role: jika belum login diarahkan ke `/login/{role}`, jika role tidak sesuai `abort(403)`.
+  - Digunakan di group route:
+    - `middleware(['role:superadmin'])`
+    - `middleware(['role:seller'])`
+
+- **`resources/views`**
+  - `guest/*`: home, cart, checkout
+  - `auth/*`: login seller & superadmin
+  - `superadmin/*`: CRUD sellers dan products
+  - `seller/*`: kelola store & products
+  - `layouts/*`, `partials/*`: layout dan komponen UI
+
+- **`database/migrations`**
+  - Tabel utama: `users`, `sellers`, `products`, `carts`, `cart_items`, `orders`, `order_items`
+
+---
+
+## Penjelasan singkat business rule
+
+Berikut aturan bisnis yang memang diterapkan di `routes/web.php` (bukan hanya “wacana”):
+
+### 1) Role & akses halaman
+
+- **Superadmin** hanya boleh akses prefix `/superadmin/*`.
+- **Seller** hanya boleh akses prefix `/seller/*`.
+- Jika tidak login, otomatis diarahkan ke:
+  - `/login/superadmin` atau
+  - `/login/seller`
+
+### 2) Aturan Seller
+
+- Seller memiliki `status`: `active` / `inactive`.
+- **Seller berstatus inactive tidak boleh**:
+  - ditambahkan produk baru (superadmin maupun seller)
+  - memindahkan produk ke seller inactive
+
+### 3) Aturan Produk
+
+- Validasi input produk:
+  - `name` wajib, max 255
+  - `price` wajib numeric dan **> 0** (`gt:0`)
+  - `stock` wajib integer dan **>= 0** (`min:0`)
+  - `status` wajib `active|inactive`
+  - `image_url` opsional max 2048
+
+### 4) Aturan Cart
+
+- Menambah ke cart (`/cart/add/{product}`):
+  - `qty` wajib integer minimal 1
+  - produk harus `status=active`
+  - stok harus > 0
+  - qty disimpan akan di-*clamp* ke stok tersedia (tidak bisa melebihi stok)
+
+### 5) Aturan Checkout
+
+- Checkout membutuhkan data:
+  - `name`, `email`, `address`
+- Checkout berjalan dalam `DB::transaction()` dan melakukan `lockForUpdate()` pada produk.
+- Jika stok tidak cukup, transaksi dibatalkan dan user mendapat pesan error.
+- Jika sukses:
+  - membuat `orders` dan `order_items`
+  - mengurangi `stock`
+  - menambah `sold_count`
+  - mengosongkan `cart_items`
+
+---
+
+## Bagaimana cara memastikan fitur berjalan dengan benar?
+
+Berikut checklist uji manual yang langsung mengacu pada route + validasi yang ada.
+
+### A) Guest / Marketplace
+
+- **Home (list produk)**
+  - Buka `/`
+  - Pastikan hanya produk dengan `status=active` yang tampil.
+  - Coba:
+    - search `q`
+    - filter availability: `in_stock` / `out_of_stock`
+    - sort: `newest`, `oldest`, `price_asc`, `price_desc`, `name_asc`, `name_desc`
+
+- **Cart**
+  - Tambah produk: POST `/cart/add/{product}` dengan `qty=1`
+  - Buka `/cart` dan pastikan item masuk.
+  - Update qty: POST `/cart/update` (qty tidak boleh negatif; dan akan dibatasi stok).
+  - Remove item: POST `/cart/remove/{product}`.
+
+- **Checkout**
+  - Buka `/checkout`.
+  - Submit form checkout POST `/checkout`.
+  - Pastikan:
+    - order dibuat
+    - stok produk berkurang
+    - cart kosong
+
+### B) Superadmin
+
+- Login `/login/superadmin`.
+- **Daftar seller**: `/superadmin/sellers`.
+- Tambah seller (create), edit seller (update), hapus seller (delete).
+- **Daftar produk**: `/superadmin/products`.
+  - Coba filter produk per seller dengan query `?seller_id=...`.
+
+### C) Seller
+
+- Login `/login/seller`.
+- **Kelola toko**: `/seller/store` (edit nama toko).
+- **Daftar produk seller**: `/seller/products`.
+- Tambah/edit/hapus produk milik seller.
+
+---
+
+## Contoh skenario error yang mungkin terjadi dan bagaimana penanganannya
+
+### 1) Salah login / role tidak sesuai
+
+- **Skenario**: login dengan email/password salah.
+  - **Hasil**: redirect back dengan pesan `Email atau password salah.`
+
+- **Skenario**: login seller tapi akun role bukan seller.
+  - **Hasil**: user di-logout, redirect back dengan `Akun ini bukan seller.`
+
+- **Skenario**: user mencoba akses `/superadmin/*` tapi rolenya seller.
+  - **Hasil**: middleware `EnsureRole` melakukan `abort(403)`.
+
+### 2) Checkout dengan cart kosong
+
+- **Skenario**: buka `/checkout` lalu submit tanpa ada item.
+  - **Hasil**: redirect back dengan pesan `Cart masih kosong`.
+
+### 3) Stok tidak cukup saat checkout (race condition / stok berubah)
+
+- **Skenario**: di cart qty=10, tetapi stok produk tinggal 3.
+  - **Hasil**: saat checkout, sistem melempar exception:
+    - `Stok tidak cukup untuk produk: ...`
+  - **Penanganan**: `try/catch` di route checkout mengembalikan `back()->withInput()->with('error', $e->getMessage())`.
+
+### 4) Produk tidak bisa ditambahkan jika seller inactive
+
+- **Skenario**: superadmin menambah produk untuk seller berstatus `inactive`.
+  - **Hasil**: `withErrors(['seller_id' => 'Produk tidak dapat ditambahkan jika seller berstatus Nonaktif.'])`
+
+- **Skenario**: seller yang tokonya inactive mencoba menambah produk lewat `/seller/products/create`.
+  - **Hasil**: redirect back dengan `Produk tidak dapat ditambahkan jika seller berstatus Nonaktif.`
+
+---
+
+## Contoh minimal 1 data yang gagal validasi (dan alasannya)
+
+### Contoh 1: Gagal validasi qty cart
+
+- Endpoint: POST `/cart/add/{product}`
+- Payload:
+  - `qty = 0`
+
+**Kenapa gagal?**
+
+Karena validasi menetapkan `qty` harus `integer` dan **minimal 1**:
+
+- `qty` => `required|integer|min:1`
+
+Laravel akan otomatis redirect back dan mengisi error bag (bisa ditampilkan di UI dengan `@error('qty')`).
+
+### Contoh 2: Gagal validasi produk (harga tidak valid)
+
+- Endpoint: POST `/seller/products`
+- Payload:
+  - `name = "Produk A"`
+  - `price = 0`
+  - `stock = 10`
+  - `status = active`
+
+**Kenapa gagal?**
+
+Karena `price` wajib **lebih besar dari 0** (`gt:0`).
+
+---
+
+## Daftar halaman penting (untuk demo)
+
+### Guest
+
+- Home: `/`
+- Cart: `/cart`
+- Checkout: `/checkout`
+
+### Auth
+
+- Login seller: `/login/seller`
+- Login superadmin: `/login/superadmin`
+- Logout: POST `/logout`
 
 ### Superadmin
-- Email: `superadmin@marketplace.test`
-- Password: `password123`
+
+- Sellers
+  - Index: `/superadmin/sellers`
+  - Create: `/superadmin/sellers/create`
+  - Store: POST `/superadmin/sellers`
+  - Edit: `/superadmin/sellers/{seller}/edit`
+  - Update: PUT `/superadmin/sellers/{seller}`
+  - Delete: DELETE `/superadmin/sellers/{seller}`
+
+- Products
+  - Index: `/superadmin/products`
+  - Create: `/superadmin/products/create`
+  - Store: POST `/superadmin/products`
+  - Edit: `/superadmin/products/{product}/edit`
+  - Update: PUT `/superadmin/products/{product}`
+  - Delete: DELETE `/superadmin/products/{product}`
 
 ### Seller
-- Email: `seller.alpha@marketplace.test`
-- Password: `password123`
 
-atau
+- Store
+  - Edit: `/seller/store`
+  - Update: PUT `/seller/store`
 
-- Email: `seller.beta@marketplace.test`
-- Password: `password123`
-
-Login URL:
-- Seller: `/login/seller`
-- Superadmin: `/login/superadmin`
-
-Setelah login:
-- Superadmin diarahkan ke `/superadmin/sellers`
-- Seller diarahkan ke `/seller/products`
-
-## Testing & Analisis
-
-### Bagaimana memastikan fitur berjalan dengan benar?
-- Jalankan `php artisan migrate:fresh --seed` lalu cek:
-  - Halaman daftar seller menampilkan 3 data seed
-  - Halaman daftar product menampilkan 5 data seed
-- Uji form create:
-  - Create seller valid
-  - Create product valid (seller aktif)
-  - Create product invalid (seller inactive)
-  - Input price = 0 (harus ditolak)
-  - Input stock = -1 (harus ditolak)
-
-### Contoh skenario error & penanganannya
-- **Seller inactive tapi dipilih saat create product**
-  - Ditolak dengan error di field `seller_id`.
-- **Price <= 0**
-  - Ditolak oleh rule validation `gt:0`.
-- **Stock negatif**
-  - Ditolak oleh rule validation `min:0`.
-- **Seller/Product tidak ditemukan**
-  - Ditangani dengan pesan error (mis. saat add-to-cart: “Produk tidak ditemukan”).
+- Products
+  - Index: `/seller/products`
+  - Create: `/seller/products/create`
+  - Store: POST `/seller/products`
+  - Edit: `/seller/products/{product}/edit`
+  - Update: PUT `/seller/products/{product}`
+  - Delete: DELETE `/seller/products/{product}`
 
 ---
 
-## Screenshot (tempat menaruh di README)
-Tambahkan screenshot hasil aplikasi berjalan:
+## Screenshot aplikasi (wajib diisi)
 
-- Halaman daftar seller
-  - `docs/screenshots/sellers-index.png`
-- Halaman daftar produk
-  - `docs/screenshots/products-index.png`
-- Contoh proses tambah data
-  - `docs/screenshots/create-product.png`
+Simpan screenshot di folder (contoh): `docs/screenshots/` lalu update link markdown di bawah.
 
----
+### 1) Halaman daftar seller
 
-## Struktur Folder Terkait
-- `app/Models` (Seller, Product)
-- `database/migrations` (sellers, products)
-- `database/seeders` (SellerSeeder, ProductSeeder)
-- `resources/views` (Blade UI untuk guest, seller, superadmin)
+![Halaman daftar seller](docs/screenshots/01-superadmin-sellers-index.png)
+
+### 2) Halaman daftar produk
+
+![Halaman daftar produk](docs/screenshots/02-superadmin-products-index.png)
+
+### 3) Contoh proses tambah data (seller atau produk)
+
+![Proses tambah produk](docs/screenshots/03-seller-products-create.png)
+
