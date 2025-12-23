@@ -73,17 +73,7 @@ Lalu:
 
 ### 5) Menjalankan aplikasi
 
-#### Mode manual
-
-- Backend: `php artisan serve`
-- Frontend (Vite): `npm run dev`
-
-#### Mode cepat via composer script
-
-Project menyediakan script di `composer.json`:
-
-- Setup sekali jalan: `composer run setup`
-- Dev (server + queue + vite): `composer run dev`
+`php artisan serve`
 
 Buka:
 
@@ -371,4 +361,12 @@ Screenshot di bawah menggunakan file yang sudah ada di root project.
 ![Proses tambah produk](tambah_produk.png)
 
 ![Proses tambah seller](tambah_seller.png)
+
+### 4) Halaman produk (Guest)
+
+![Halaman produk guest](tampil_produk.png)
+
+### 5) Halaman keranjang (Guest)
+
+![Halaman keranjang guest](tampil_keranjang.png)
 
